@@ -32,28 +32,37 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
+      - name: Build Server Terminal EXE
+        run: npm run dist:server
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Verify EXE outputs
         shell: pwsh
         run: |
           $files = @(Get-ChildItem -Path dist -Filter '*.exe' -File)
           $files | Select-Object Name,Length | Format-Table
           if ($files.Count -lt 2) { throw "Expected installer and portable EXE. Found $($files.Count)." }
+          if (!(Test-Path 'dist-server/*.exe')) { throw 'Server Terminal EXE missing' }
       - name: Upload Windows binaries as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: YEON-Windows-EXE
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist-server/*.exe
           if-no-files-found: error
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.4.1
-          name: YEON v0.4.1 - Windows
+          tag_name: v0.6.0
+          name: YEON v0.6.0 - Windows
           target_commitish: ${{ github.sha }}
           body: |
             Windows용 YEON 채팅 앱 빌드입니다.
             현재 공용 채팅 서버는 별도로 배포해야 하며 앱에 서버 URL 설정이 필요합니다.
             인터넷 연결에 실패하면 Wi-Fi 설정 안내 화면이 나타납니다.
-          files: dist/*.exe
+          files: |
+            dist/*.exe
+            dist-server/*.exe
           fail_on_unmatched_files: true
           overwrite_files: true
