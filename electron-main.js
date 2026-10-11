@@ -47,6 +47,7 @@ async function check(force=false){
  }catch{showOffline();if(force)await win.loadURL(offline())}finally{checking=false}
 }
 ipcMain.handle('choose-mode',async(_e,choice,address)=>{try{return await connect(choice,address)}catch(e){return {error:e.message}}});
+ipcMain.on('yeon-window-double-click-quit',event=>{if(win&&event.sender===win.webContents)app.quit()});
 ipcMain.handle('show-servers',()=>showSelection());
 ipcMain.handle('enter-code',async(_event,code)=>{if(code!=='Veylo@Xk#Qp')return {error:'서버 코드가 올바르지 않습니다.'};try{const local=await ensureLocal();baseURL=local;mode='local';await check(true);return {ok:true}}catch(error){return {error:'채팅 화면을 시작하지 못했습니다: '+error.message}}});
 ipcMain.handle('open-veylo',()=>shell.openPath(path.join(__dirname,'veylo','index.html')));
