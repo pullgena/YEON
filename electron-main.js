@@ -49,7 +49,7 @@ async function check(force=false){
 ipcMain.handle('choose-mode',async(_e,choice,address)=>{try{return await connect(choice,address)}catch(e){return {error:e.message}}});
 ipcMain.handle('show-servers',()=>showSelection());
 ipcMain.handle('enter-code',async(_event,code)=>{if(code!=='Veylo@Xk#Qp')return {error:'서버 코드가 올바르지 않습니다.'};try{const local=await ensureLocal();baseURL=local;mode='local';await check(true);return {ok:true}}catch(error){return {error:'채팅 화면을 시작하지 못했습니다: '+error.message}}});
-ipcMain.handle('open-veylo',()=>shell.openExternal('https://pullgena.github.io/YEON/'));
+ipcMain.handle('open-veylo',()=>shell.openExternal(require('node:url').pathToFileURL(path.join(__dirname,'veylo','index.html')).toString()));
 ipcMain.handle('retry-connection',()=>check(true));
 ipcMain.handle('open-wifi-settings',()=>shell.openExternal(process.platform==='win32'?'ms-settings:network-wifi':'https://support.microsoft.com/windows'));
 app.whenReady().then(async()=>{
