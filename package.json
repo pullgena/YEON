@@ -42,8 +42,7 @@
             "x64"
           ]
         }
-      ],
-      "artifactName": "YEON-${version}-${arch}-${target}.${ext}"
+      ]
     },
     "nsis": {
       "oneClick": false,
