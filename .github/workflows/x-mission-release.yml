@@ -31,12 +31,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'x-mission-v1.0.0'
+          $tag = 'x-mission-v1.1.0'
           $asset = Get-ChildItem 'x-mission/dist/*.exe' | Select-Object -First 1
           if (-not $asset) { throw 'EXE output missing' }
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $asset.FullName --clobber
           } else {
-            gh release create $tag $asset.FullName --title 'YEON X Mission v1.0.0' --notes 'Windows portable EXE. Chrome-style X button mission app.' --target $env:GITHUB_SHA
+            gh release create $tag $asset.FullName --title 'YEON X Mission v1.1.0' --notes 'Windows portable EXE. Chrome-style X button mission app.' --target $env:GITHUB_SHA
           }
