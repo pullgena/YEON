@@ -88,6 +88,25 @@
 
 
 
+  .weakWifiBanner{
+    position:fixed;z-index:950;left:50%;top:12px;transform:translateX(-50%);
+    display:none;align-items:center;gap:9px;
+    padding:8px 13px;border-radius:12px;
+    background:rgba(20,20,20,.88);color:#fff;
+    border:1px solid rgba(255,255,255,.15);
+    box-shadow:0 6px 18px rgba(0,0,0,.28);
+    font-size:13px;font-weight:800;backdrop-filter:blur(8px);
+    pointer-events:none;
+  }
+  .weakWifiIcon{display:flex;align-items:center;gap:5px;font-size:18px}
+  .weakSignal{display:flex;align-items:flex-end;gap:2px;height:15px}
+  .weakSignal i{display:block;width:3px;border-radius:2px;background:#777}
+  .weakSignal i:nth-child(1){height:5px;background:#fff}
+  .weakSignal i:nth-child(2){height:8px}
+  .weakSignal i:nth-child(3){height:11px}
+  .weakSignal i:nth-child(4){height:14px}
+  .weakWifiPing{font-size:11px;font-weight:600;color:#b9b9b9;margin-left:2px}
+
   .offlineScreen{
     position:fixed;inset:0;z-index:1000;display:none;
     background:#000;color:#fff;align-items:center;justify-content:center;
@@ -525,6 +544,15 @@
   </div>
 </div>
 
+<div class="weakWifiBanner" id="weakWifiBanner">
+  <div class="weakWifiIcon">
+    <span>🌐</span>
+    <span class="weakSignal" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+  </div>
+  <span>와이파이가 안좋습니다.</span>
+  <span class="weakWifiPing" id="weakWifiPing"></span>
+</div>
+
 <div class="offlineScreen" id="offlineScreen">
   <div class="offlineIconWrap" aria-hidden="true">
     <div class="offlineGlobe">🌐</div>
@@ -609,6 +637,7 @@
     if(!screen)return;
     screen.style.display=show?"flex":"none";
     lastKnownOnline=!show;
+    if(show)setWeakWifiBanner(false);
     if(!show&&$("offlineStatus"))$("offlineStatus").textContent="";
   }
 
@@ -620,6 +649,63 @@
       }
     }catch(_){}
     setOfflineScreen(!online);
+  }
+  let weakWifiBadCount=0;
+  let weakWifiGoodCount=0;
+  let weakWifiTimer=null;
+
+  function setWeakWifiBanner(show,ping=null){
+    const banner=$("weakWifiBanner");
+    const pingEl=$("weakWifiPing");
+    if(!banner)return;
+    const offlineVisible=$("offlineScreen")?.style.display==="flex";
+    if(offlineVisible)show=false;
+    banner.style.display=show?"flex":"none";
+    if(pingEl){
+      pingEl.textContent=show&&Number.isFinite(ping)?`${Math.round(ping)}ms`:"";
+    }
+  }
+
+  async function checkNetworkQuality(){
+    if(navigator.onLine===false){
+      weakWifiBadCount=0;
+      weakWifiGoodCount=0;
+      setWeakWifiBanner(false);
+      return;
+    }
+
+    try{
+      if(!window.yeonNative?.getNetworkQuality)return;
+      const q=await window.yeonNative.getNetworkQuality();
+
+      if(!q?.online){
+        setWeakWifiBanner(false);
+        return;
+      }
+
+      const latency=Number(q.latency);
+      const poor=!q.ok || !Number.isFinite(latency) || latency>=260;
+
+      if(poor){
+        weakWifiBadCount++;
+        weakWifiGoodCount=0;
+      }else if(latency<=180){
+        weakWifiGoodCount++;
+        weakWifiBadCount=0;
+      }
+
+      if(weakWifiBadCount>=2){
+        setWeakWifiBanner(true,latency);
+      }else if(weakWifiGoodCount>=2){
+        setWeakWifiBanner(false);
+      }
+    }catch(_){}
+  }
+
+  function startNetworkQualityMonitor(){
+    clearInterval(weakWifiTimer);
+    checkNetworkQuality();
+    weakWifiTimer=setInterval(checkNetworkQuality,5000);
   }
 
   async function openWifiSettings(){
@@ -2691,6 +2777,7 @@
 
   setPortalState();applyLanguage();refreshUI();renderShop();updateBugInboxCount();updateReviveUI();$("languageSelect").value=state.settings.language;$("soundToggle").checked=state.settings.sound;$("sfxToggle").checked=state.settings.sfx;
   refreshConnectivity();
+  startNetworkQualityMonitor();
 
   let last=performance.now()/1000;
   let frameCapLastMs=0;
