@@ -1,0 +1,2665 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blade Dimensions Online</title>
+<style>
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#070a10;color:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+  *{box-sizing:border-box}
+  #game{width:100%;height:100%;display:block;touch-action:none;cursor:default}
+  .hud{position:fixed;inset:0;pointer-events:none}
+  .top{position:absolute;left:14px;top:14px;display:flex;gap:8px;flex-wrap:wrap;max-width:calc(100vw - 28px)}
+  .pill,.mini{background:rgba(7,11,19,.86);border:1px solid rgba(255,255,255,.14);border-radius:13px;backdrop-filter:blur(8px)}
+  .pill{padding:8px 11px}.pill .k{font-size:11px;opacity:.65}.pill .v{font-size:15px;font-weight:800;margin-top:2px}
+  .rightTop{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  .mini{padding:8px 10px;font-size:12px;line-height:1.5;max-width:290px}
+  .bars{position:absolute;left:14px;bottom:16px;width:min(355px,calc(100vw - 28px))}
+  .box{background:rgba(7,11,19,.86);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:11px;margin-top:8px}
+  .bar{height:15px;background:#252b36;border-radius:999px;overflow:hidden;margin-top:7px}
+  .fill{height:100%;background:linear-gradient(90deg,#35d48a,#8befbd);width:100%;transition:width .15s}
+  .enemyFill{background:linear-gradient(90deg,#ff6464,#ffa170)}
+  .bossFill{background:linear-gradient(90deg,#b866ff,#ff5f91)}
+  #targetBox{display:none}
+  .skills{position:absolute;right:14px;bottom:16px;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:560px}
+  .skill{min-width:105px}.skill b{font-size:12px}.skill small{display:block;opacity:.64;margin-top:3px}
+  .centerMsg{position:absolute;left:50%;top:18%;transform:translateX(-50%);font-size:25px;font-weight:900;text-align:center;text-shadow:0 4px 16px #000;opacity:0;transition:opacity .18s;max-width:80vw}
+  .hint{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;opacity:.58;white-space:nowrap}
+  .overlay{position:fixed;z-index:50;inset:0;background:radial-gradient(circle at 50% 30%,rgba(36,50,82,.96),rgba(4,6,10,.99));display:flex;align-items:center;justify-content:center;padding:22px}
+  .screen{width:min(920px,100%);max-height:92vh;overflow:auto;text-align:center}
+  .title{font-size:clamp(38px,7vw,76px);margin:0;letter-spacing:-.04em}
+  .subtitle{opacity:.75;line-height:1.6;margin:8px auto 18px;max-width:720px}
+  .menuGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:18px 0}
+  .card{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.11);border-radius:17px;padding:16px;text-align:left}
+  .card h3{margin:0 0 6px}.card p{margin:0;opacity:.7;font-size:13px;line-height:1.5}
+  button,input{font:inherit}
+  button{border:0;border-radius:11px;padding:11px 14px;font-weight:800;cursor:pointer;background:#eef3ff;color:#111522}
+  button.secondary{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.12)}
+  button.danger{background:#ff6577;color:#fff}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  input{width:100%;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff;border-radius:11px;padding:11px 12px;outline:none}
+  label{display:block;text-align:left;font-size:13px;margin-bottom:6px;opacity:.78}
+  .form{display:grid;gap:10px;max-width:470px;margin:0 auto}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .centerRow{justify-content:center}
+  .roomCode{font-size:34px;font-weight:900;letter-spacing:.12em;margin:12px 0}
+  .players{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:14px 0}
+  .playerCard{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.11);border-radius:13px;padding:12px;text-align:left}
+  .status{font-size:12px;opacity:.66}
+  #roomScreen,#joinScreen,#lobbyScreen,#gameOver,#winScreen,#tutorial{display:none}
+  .panel{position:fixed;z-index:35;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,calc(100vw - 28px));max-height:82vh;overflow:auto;background:rgba(6,9,16,.98);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:20px;display:none}
+  .weaponGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:12px}
+  .weapon{border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:13px;background:rgba(255,255,255,.04)}
+  .weapon.eq{outline:2px solid #75d7ff}.weapon h3{margin:0 0 6px}.meta{font-size:13px;opacity:.73;line-height:1.5}
+  .common{color:#d9dde7}.uncommon{color:#61df89}.rare{color:#64aaff}.epic{color:#ce70ff}.legendary{color:#ffc650}
+  .tutorialBox{max-width:620px;margin:auto;background:rgba(5,8,14,.96);border:1px solid rgba(255,255,255,.16);border-radius:20px;padding:22px;text-align:left}
+  .tutorialBox h2{margin:0 0 8px}.tutorialBox p{opacity:.78;line-height:1.6}
+  .step{font-size:13px;opacity:.6;margin-bottom:8px}
+  .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;margin-top:12px}
+  .key{border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px;background:rgba(255,255,255,.035)}
+  .netDot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7d8798;margin-right:5px}.online{background:#51dc88}.warn{background:#ffbc57}
+
+  .pauseBtn{pointer-events:auto;position:absolute;right:14px;top:98px;border:1px solid rgba(255,255,255,.15);background:rgba(7,11,19,.9);color:#fff;border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer}
+  .pauseState{position:absolute;left:50%;top:70px;transform:translateX(-50%);padding:7px 12px;border-radius:999px;background:rgba(255,181,71,.16);border:1px solid rgba(255,181,71,.45);font-size:12px;font-weight:800;display:none}
+  .settingsGrid{display:grid;gap:12px;max-width:520px;margin:14px auto 0;text-align:left}
+  .settingRow{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px;border:1px solid rgba(255,255,255,.11);border-radius:13px;background:rgba(255,255,255,.035)}
+  .settingRow select{min-width:150px;border:1px solid rgba(255,255,255,.15);background:#151b27;color:#fff;border-radius:10px;padding:9px}
+  .switch{display:flex;align-items:center;gap:8px}
+  .switch input{width:auto}
+  textarea{width:100%;min-height:120px;resize:vertical;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff;border-radius:11px;padding:11px 12px;font:inherit}
+  .bugResult{margin-top:10px;font-size:13px;opacity:.78}
+  .aimDot{position:absolute;width:12px;height:12px;border:2px solid rgba(255,255,255,.9);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;box-shadow:0 0 0 2px rgba(0,0,0,.25);display:none}
+
+
+  .bugInboxList{display:grid;gap:9px;margin-top:12px;text-align:left}
+  .bugInboxItem{border:1px solid rgba(255,255,255,.12);border-radius:13px;padding:12px;background:rgba(255,255,255,.035)}
+  .bugInboxItem .topline{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+  .bugInboxItem .bugdesc{margin-top:8px;white-space:pre-wrap;word-break:break-word;line-height:1.5}
+  .bugInboxItem .bugmeta{font-size:12px;opacity:.62;margin-top:6px}
+  .countBadge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:#ff6878;color:#fff;font-size:12px;font-weight:900}
+
+
+  .deathTitle{font-size:clamp(54px,12vw,112px);letter-spacing:.08em;margin:0 0 8px;font-weight:1000}
+  .reviveBig{font-size:18px;margin:10px 0;font-weight:900}
+  .spectateBar{position:fixed;z-index:45;left:50%;bottom:22px;transform:translateX(-50%);display:none;
+    background:rgba(7,11,19,.94);border:1px solid rgba(255,255,255,.15);border-radius:15px;padding:10px 12px;
+    align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+  .spectateBar button{padding:8px 10px}
+
+
+  .catNetworkScreen{position:fixed;inset:0;z-index:200;display:none;background:#fff;color:#111;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
+  .catStage{position:relative;width:360px;height:390px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px;box-sizing:border-box}
+  .heroNet{position:relative;width:160px;height:205px;transform-origin:50% 80%;margin-top:120px}
+  .heroNet.noNo{animation:heroNoNo .26s ease-in-out infinite alternate}
+  .heroNet.shock{transform:rotate(-2deg) scale(1.03)}
+  .heroNet.electric{animation:heroElectricShake .11s linear infinite alternate}
+  .electricBolt{
+    position:absolute;left:50%;top:-85px;width:9px;height:145px;
+    transform:translateX(-50%) rotate(8deg);
+    background:linear-gradient(to bottom,#dff8ff 0%,#8ee7ff 35%,#ffffff 58%,#54cfff 100%);
+    box-shadow:0 0 9px #8ee7ff,0 0 18px #66d7ff,0 0 32px #5dc8ff;
+    clip-path:polygon(40% 0,100% 0,66% 32%,100% 32%,34% 100%,49% 54%,0 54%);
+    opacity:0;pointer-events:none;
+  }
+  .heroNet.electric .electricBolt{opacity:1;animation:electricFlash .18s linear infinite alternate}
+  .hostLeftTime{
+    margin-top:10px;padding:8px 13px;border-radius:10px;background:#f2f2f2;
+    border:1px solid #d9d9d9;color:#333;font-size:13px;font-weight:800;
+    text-align:center;max-width:360px;
+  }
+  @keyframes heroElectricShake{from{transform:translateX(-3px) rotate(-2deg)}to{transform:translateX(3px) rotate(2deg)}}
+  @keyframes electricFlash{from{filter:brightness(.85);opacity:.55}to{filter:brightness(1.5);opacity:1}}
+  .heroHead{position:absolute;left:48px;top:20px;width:64px;height:64px;background:#f1c7a1;border:4px solid #222;border-radius:18px}
+  .heroHair{position:absolute;left:44px;top:13px;width:72px;height:30px;background:#3c2d24;border:4px solid #222;border-radius:18px 18px 8px 8px}
+  .heroEye{position:absolute;top:43px;width:8px;height:11px;background:#222;border-radius:50%}
+  .heroEye.left{left:62px}.heroEye.right{right:62px}
+  .heroMouth{position:absolute;left:50%;top:69px;width:20px;height:8px;transform:translateX(-50%);border-bottom:3px solid #222;border-radius:0 0 12px 12px}
+  .heroBody{position:absolute;left:39px;top:84px;width:82px;height:76px;background:#5b8fc9;border:4px solid #222;border-radius:12px}
+  .heroArmor{position:absolute;left:47px;top:91px;width:66px;height:48px;background:#8795a8;border:4px solid #222;border-radius:10px}
+  .heroBelt{position:absolute;left:39px;top:139px;width:82px;height:12px;background:#5a3e2b;border:3px solid #222}
+  .heroArm{position:absolute;top:95px;width:24px;height:67px;background:#f1c7a1;border:4px solid #222;border-radius:12px}
+  .heroArm.left{left:14px;transform:rotate(8deg)}
+  .heroArm.right{right:14px;transform:rotate(-8deg)}
+  .heroLeg{position:absolute;top:155px;width:28px;height:45px;background:#273247;border:4px solid #222;border-radius:8px}
+  .heroLeg.left{left:43px}.heroLeg.right{right:43px}
+  .heroSword{position:absolute;right:-3px;top:105px;width:13px;height:87px;background:#d8dde5;border:3px solid #222;border-radius:4px;transform:rotate(-18deg);transform-origin:50% 90%}
+  .heroSword:before{content:"";position:absolute;left:-13px;top:57px;width:36px;height:8px;background:#d9ba6e;border:3px solid #222;border-radius:4px}
+  .catBubble{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:min(320px,calc(100vw - 40px));min-width:220px;max-width:320px;padding:14px 18px;background:#fff;border:4px solid #222;border-radius:22px;font-size:20px;line-height:1.38;font-weight:1000;text-align:center;box-shadow:4px 5px 0 #222;animation:bubblePop .32s cubic-bezier(.2,1.4,.4,1);z-index:5;word-break:keep-all}
+  .catBubble:after{content:"";position:absolute;left:50%;bottom:-17px;width:23px;height:23px;background:#fff;border-right:4px solid #222;border-bottom:4px solid #222;transform:translateX(-50%) rotate(45deg);z-index:-1}
+  .catNetworkSub{margin-top:14px;font-size:14px;color:#555;font-weight:700;text-align:center;max-width:min(360px,calc(100vw - 34px));line-height:1.45}
+  @keyframes heroNoNo{from{transform:rotate(-8deg)}to{transform:rotate(8deg)}}
+  @keyframes bubblePop{from{transform:translateX(-50%) scale(.35);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+  .creditsScreen{
+    position:fixed;inset:0;z-index:120;display:none;overflow:hidden;
+    background:radial-gradient(circle at 50% 35%,#172239 0%,#080b12 45%,#020306 100%);
+    color:#fff;
+  }
+  .creditsFade{
+    position:absolute;inset:0;pointer-events:none;z-index:2;
+    background:linear-gradient(to bottom,rgba(2,3,6,1) 0%,rgba(2,3,6,0) 15%,rgba(2,3,6,0) 82%,rgba(2,3,6,1) 100%);
+  }
+  .creditsRoll{
+    position:absolute;left:50%;top:100%;transform:translateX(-50%);
+    width:min(760px,calc(100vw - 40px));text-align:center;
+    animation:creditsScroll 26s linear forwards;
+  }
+  .creditsRoll h1{font-size:clamp(46px,9vw,90px);margin:0 0 56px;letter-spacing:.12em}
+  .creditsRoll h2{font-size:24px;margin:52px 0 12px;color:#91dcff}
+  .creditsRoll p{font-size:16px;line-height:1.85;opacity:.9;margin:7px 0}
+  .creditsRoll .bigThanks{font-size:27px;font-weight:950;margin-top:72px}
+  .creditsRoll .theEnd{font-size:54px;font-weight:1000;letter-spacing:.18em;margin-top:100px}
+  .creditsControls{
+    position:absolute;z-index:4;left:50%;bottom:24px;transform:translateX(-50%);
+    display:flex;gap:10px;justify-content:center;
+  }
+  @keyframes creditsScroll{
+    from{top:100%}
+    to{top:-1750px}
+  }
+  .debugPanel{position:fixed;z-index:90;left:10px;top:10px;display:none;
+    min-width:300px;max-width:min(520px,calc(100vw - 20px));padding:10px 12px;
+    border-radius:8px;background:rgba(0,0,0,.62);color:#fff;font-family:Consolas,Monaco,monospace;
+    font-size:13px;line-height:1.45;text-shadow:0 1px 2px #000;pointer-events:none;
+    white-space:pre-wrap}
+  .debugPanel .debugTitle{font-weight:900;margin-bottom:5px;color:#dff7ff}
+  .natureMission{position:fixed;z-index:32;left:50%;top:18px;transform:translateX(-50%);
+    width:min(640px,calc(100vw - 32px));padding:12px 16px;border-radius:16px;
+    background:rgba(10,34,18,.93);border:1px solid rgba(94,225,120,.5);
+    box-shadow:0 0 26px rgba(69,220,102,.15);display:none;text-align:center}
+  .natureMission .title{font-weight:1000;color:#9ff6af;font-size:17px}
+  .natureMission .sub{font-size:12px;opacity:.78;margin-top:4px}
+  .bossHud{position:fixed;z-index:31;left:50%;top:72px;transform:translateX(-50%);
+    width:min(720px,calc(100vw - 32px));padding:10px 14px;border-radius:15px;
+    background:rgba(18,4,28,.92);border:1px solid rgba(210,90,255,.58);
+    box-shadow:0 0 28px rgba(183,65,255,.18);display:none;pointer-events:none}
+  .bossHud .bossRow{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:950}
+  .bossHud .bossName{color:#f0b8ff;letter-spacing:.04em}
+  .bossHud .bossBar{height:17px;margin-top:7px;border-radius:999px;overflow:hidden;
+    background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.12)}
+  .bossHud .bossFill{height:100%;width:100%;background:linear-gradient(90deg,#7f35df,#e249ff);
+    transition:width .12s linear}
+  .shopTimer{display:inline-block;margin-top:5px;padding:4px 8px;border-radius:999px;background:rgba(255,188,87,.14);
+    border:1px solid rgba(255,188,87,.35);font-size:12px;font-weight:900}
+
+  @media(max-width:720px){.rightTop{display:none}.skills{bottom:127px}.hint{display:none}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div class="hud">
+  <div class="top">
+    <div class="pill"><div class="k">골드</div><div class="v" id="gold">0</div></div>
+    <div class="pill"><div class="k">처치</div><div class="v" id="kills">0</div></div>
+    <div class="pill"><div class="k">현재 위치</div><div class="v" id="dimension">차원 로비</div></div>
+    <div class="pill"><div class="k">무기</div><div class="v" id="weaponName">낡은 검</div></div><div class="pill"><div class="k">팀 부활권</div><div class="v" id="reviveTickets">5</div></div>
+  </div>
+  <div class="rightTop">
+    <div class="mini"><span class="netDot" id="netDot"></span><b id="netText">오프라인</b><br><span id="roomHud">혼자 연습</span></div>
+    <div class="mini" id="dimHelp"></div>
+  </div>
+
+  <div class="bars">
+    <div class="box">
+      <div class="row" style="justify-content:space-between"><b>HP</b><span id="hpText">100 / 100</span></div><div class="status" id="regenText" style="margin-top:5px">피해를 받지 않으면 자동 회복</div>
+      <div class="bar"><div class="fill" id="hpFill"></div></div>
+    </div>
+    <div class="box" id="targetBox">
+      <div class="row" style="justify-content:space-between"><b id="targetName">적</b><span id="targetHp"></span></div>
+      <div class="bar"><div class="fill enemyFill" id="targetFill"></div></div>
+    </div>
+  </div>
+
+  <div class="skills">
+    <div class="pill skill"><b>Q 회전 베기</b><small id="spinCd">사용 가능</small></div>
+    <div class="pill skill"><b>R 돌진 베기</b><small id="dashCd">사용 가능</small></div>
+    <div class="pill skill"><b>F 방어</b><small>누르고 있기</small></div>
+    <div class="pill skill"><b>E 회피</b><small>짧은 대시</small></div>
+    <div class="pill skill"><b>B 상점</b><small>구매·강화</small></div>
+  </div>
+
+  <button class="pauseBtn" id="pauseBtn">⏸ 정지</button>
+  <div class="pauseState" id="pauseState">⏸ 전투 정지 중</div>
+  <div class="aimDot" id="aimDot"></div>
+  <div class="centerMsg" id="msg"></div>
+  <div class="hint">WASD 이동 · 우클릭 드래그 화면 회전 · 휠 줌 · Space 점프 · 좌클릭 공격</div>
+</div>
+
+<div class="debugPanel" id="debugPanel">
+  <div class="debugTitle">Blade Dimensions Debug [F3]</div>
+  <div id="debugText"></div>
+</div>
+
+<div class="bossHud" id="boss2Hud">
+  <div class="bossRow">
+    <span class="bossName">👑 보스2 · 심연의 지배자</span>
+    <span id="boss2HpText">1000 / 1000</span>
+  </div>
+  <div class="bossBar"><div class="bossFill" id="boss2HpFill"></div></div>
+</div>
+
+<div class="natureMission" id="natureMission">
+  <div class="title">🌿 미션: 모든 맵을 자연으로 뒤덮으세요</div>
+  <div class="sub" id="natureMissionSub">보스2를 쓰러뜨리면 자연의 힘이 깨어납니다.</div>
+</div>
+
+<div class="overlay" id="home">
+  <div class="screen">
+    <h1 class="title">BLADE DIMENSIONS</h1>
+    <p class="subtitle">친구들과 방을 만들고 차원을 열어 함께 싸우는 3D 칼 전투 게임</p>
+    <div class="form" style="margin-bottom:14px">
+      <div>
+        <label for="nickname">닉네임</label>
+        <input id="nickname" maxlength="14" value="BladePlayer" placeholder="닉네임">
+      </div>
+    </div>
+    <div class="menuGrid">
+      <div class="card">
+        <h3>🌐 멀티 방 만들기</h3>
+        <p>방 코드가 생성됩니다. 친구가 코드를 입력하면 같은 방에 들어올 수 있습니다.</p>
+        <button id="createRoomBtn" style="margin-top:12px;width:100%">방 만들기</button>
+      </div>
+      <div class="card">
+        <h3>🔗 방 참가하기</h3>
+        <p>친구에게 받은 6자리 방 코드를 입력해 참가합니다.</p>
+        <button id="openJoinBtn" style="margin-top:12px;width:100%">코드 입력</button>
+      </div>
+      <div class="card">
+        <h3>⚔ 혼자 연습</h3>
+        <p>멀티 연결 없이 바로 차원 전투를 연습합니다.</p>
+        <button id="soloBtn" style="margin-top:12px;width:100%">연습 시작</button>
+      </div>
+      <div class="card">
+        <h3>🎓 튜토리얼</h3>
+        <p>카메라, 이동, 점프, 공격, 방어, 스킬, 포털을 순서대로 배웁니다.</p>
+        <button id="tutorialBtn" style="margin-top:12px;width:100%">튜토리얼 시작</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="joinScreen">
+  <div class="screen" style="max-width:520px">
+    <h2>방 참가하기</h2>
+    <p class="subtitle">방장이 알려준 코드를 입력하세요.</p>
+    <div class="form">
+      <div><label for="roomCodeInput">6자리 방 코드</label><input id="roomCodeInput" maxlength="6" placeholder="예: A7K2Q9"></div>
+      <button id="joinRoomBtn">참가</button>
+      <button id="joinBackBtn" class="secondary">뒤로</button>
+      <div id="joinStatus" class="status"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="lobbyScreen">
+  <div class="screen" style="max-width:760px">
+    <h2>멀티플레이 로비</h2>
+    <div class="status">방 코드</div>
+    <div class="roomCode" id="roomCodeDisplay">------</div>
+    <div class="players" id="playerList"></div>
+    <div class="row centerRow">
+      <button id="startMultiBtn">게임 시작</button>
+      <button id="leaveRoomBtn" class="secondary">방 나가기</button>
+    </div>
+    <p class="status" id="lobbyStatus">친구를 기다리는 중...</p>
+  </div>
+</div>
+
+<div class="panel" id="shop">
+  <div class="row" style="justify-content:space-between">
+    <div><h2 style="margin:0" id="shopTitle">⚔ 무기 상점</h2><p style="opacity:.7" id="shopPauseText">상점 이용자는 공격 대상에서 제외됩니다. 다른 팀원의 전투는 계속됩니다.</p><span class="shopTimer" id="shopTimer">남은 시간 60초</span></div>
+    <button id="closeShop">닫기</button>
+  </div>
+  <div class="row"><button id="upgradeBtn">장착 무기 강화</button><span id="upgradeInfo"></span></div>
+  <h3 style="margin:16px 0 6px">🗡 검</h3><div class="weaponGrid" id="weaponList"></div><h3 style="margin:20px 0 6px">🛡 갑옷</h3><p class="status" id="armorInfo">갑옷은 받는 피해를 줄여줍니다.</p><div class="weaponGrid" id="armorList"></div>
+</div>
+
+
+<div class="overlay" id="pauseMenu" style="display:none">
+  <div class="screen" style="max-width:560px">
+    <h2 id="pauseTitle">⏸ 게임 정지</h2>
+    <p class="subtitle" id="pauseDesc">전투가 정지되었습니다.</p>
+    <div class="menuGrid" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+      <div class="card">
+        <h3 id="resumeCardTitle">▶ 계속하기</h3>
+        <p id="resumeCardDesc">게임으로 돌아가 전투를 계속합니다.</p>
+        <button id="resumeBtn" style="width:100%;margin-top:12px">계속하기</button>
+      </div>
+      <div class="card">
+        <h3 id="saveCardTitle">💾 저장</h3>
+        <p id="saveCardDesc">골드, 무기, 강화, 차원 진행도를 저장합니다.</p>
+        <button id="saveBtn" style="width:100%;margin-top:12px">저장하기</button>
+      </div>
+      <div class="card">
+        <h3 id="settingsCardTitle">⚙ 설정</h3>
+        <p id="settingsCardDesc">언어와 소리, 효과음, 버그 제보를 설정합니다.</p>
+        <button id="openSettingsBtn" style="width:100%;margin-top:12px">설정 열기</button>
+      </div>
+      <div class="card">
+        <h3 id="exitCardTitle">🚪 나가기</h3>
+        <p id="exitCardDesc">현재 게임을 저장하고 홈 화면으로 나갑니다.</p>
+        <button id="exitToHomeBtn" class="danger" style="width:100%;margin-top:12px">저장 후 나가기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsScreen" style="display:none">
+  <div class="screen" style="max-width:620px">
+    <h2 id="settingsTitle">⚙ 설정</h2>
+    <p class="subtitle" id="settingsDesc">게임 환경을 변경할 수 있습니다.</p>
+    <div class="settingsGrid">
+      <div class="settingRow">
+        <div><b id="languageLabel">언어</b><div class="status" id="languageHelp">게임 표시 언어</div></div>
+        <select id="languageSelect">
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="settingRow">
+        <div><b id="soundLabel">소리</b><div class="status" id="soundHelp">게임 전체 소리</div></div>
+        <label class="switch"><input type="checkbox" id="soundToggle" checked><span id="soundOnText">켜기</span></label>
+      </div>
+      <div class="settingRow">
+        <div><b id="sfxLabel">효과음</b><div class="status" id="sfxHelp">공격, 피격, 점프 등의 효과음</div></div>
+        <label class="switch"><input type="checkbox" id="sfxToggle" checked><span id="sfxOnText">켜기</span></label>
+      </div>
+      <div class="settingRow">
+        <div>
+          <b>최대 프레임</b>
+          <div class="status">게임이 표시할 최대 FPS를 정합니다.</div>
+        </div>
+        <select id="maxFpsSelect">
+          <option value="0">제한 없음</option>
+          <option value="30">30 FPS</option>
+          <option value="60">60 FPS</option>
+          <option value="90">90 FPS</option>
+          <option value="120">120 FPS</option>
+          <option value="144">144 FPS</option>
+          <option value="165">165 FPS</option>
+          <option value="240">240 FPS</option>
+        </select>
+      </div>
+      <div class="settingRow">
+        <div><b id="bugLabel">버그 제보</b><div class="status" id="bugHelp">발견한 문제를 개발용 제보함에 저장합니다.</div></div>
+        <button id="openBugBtn">제보하기</button>
+      </div>
+      <div class="settingRow">
+        <div><b>관리자 제보함</b><div class="status">이 브라우저에 저장된 제보를 게임 안에서 바로 확인합니다.</div></div>
+        <button id="openBugInboxBtn">제보함 보기 <span class="countBadge" id="bugInboxCount">0</span></button>
+      </div>
+      <div class="settingRow">
+        <div>
+          <b>게임 데이터 초기화</b>
+          <div class="status">골드, 무기, 갑옷, 강화, 차원 진행도와 저장 데이터를 처음 상태로 되돌립니다.</div>
+        </div>
+        <button id="resetGameBtn" class="danger">초기화</button>
+      </div>
+    </div>
+    <div class="row centerRow" style="margin-top:16px">
+      <button id="settingsBackBtn" class="secondary">정지 메뉴로</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="bugScreen" style="display:none">
+  <div class="screen" style="max-width:620px">
+    <h2 id="bugTitle">🐞 버그 제보</h2>
+    <p class="subtitle" id="bugDesc">무슨 문제가 있었는지 적어주세요. 현재 버전에서는 제보가 이 브라우저의 개발용 제보함에 저장됩니다.</p>
+    <div class="form">
+      <div>
+        <label for="bugCategory" id="bugCategoryLabel">종류</label>
+        <select id="bugCategory" style="width:100%;padding:11px;border-radius:11px;background:#151b27;color:#fff;border:1px solid rgba(255,255,255,.15)">
+          <option value="camera">카메라/화면</option>
+          <option value="combat">전투</option>
+          <option value="multiplayer">멀티플레이</option>
+          <option value="shop">상점/아이템</option>
+          <option value="other">기타</option>
+        </select>
+      </div>
+      <div><label for="bugText" id="bugTextLabel">문제 설명</label><textarea id="bugText" placeholder="예: 우클릭 드래그 후 카메라가 멈췄어요."></textarea></div>
+      <button id="submitBugBtn">제보 저장</button>
+      <button id="bugBackBtn" class="secondary">설정으로</button>
+      <div class="bugResult" id="bugResult"></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="overlay" id="bugInboxScreen" style="display:none">
+  <div class="screen" style="max-width:760px">
+    <div class="row" style="justify-content:space-between">
+      <div style="text-align:left">
+        <h2 style="margin:0">📥 관리자 버그 제보함</h2>
+        <p class="subtitle" style="margin:6px 0 0">게임에서 저장된 버그 제보가 즉시 표시됩니다.</p>
+      </div>
+      <button id="bugInboxBackBtn" class="secondary">설정으로</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="bugInboxRefreshBtn" class="secondary">새로고침</button>
+      <button id="bugInboxClearBtn" class="danger">전체 삭제</button>
+    </div>
+    <div id="bugInboxList" class="bugInboxList"></div>
+    <div id="bugInboxEmpty" class="status" style="padding:32px 0">아직 버그 제보가 없습니다.</div>
+  </div>
+</div>
+
+<div class="overlay" id="tutorial">
+  <div class="tutorialBox">
+    <div class="step" id="tutorialStep">1 / 9</div>
+    <h2 id="tutorialTitle">카메라 조작</h2>
+    <p id="tutorialText"></p>
+    <div class="keys" id="tutorialKeys"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
+      <button id="skipTutorial" class="secondary">건너뛰기</button>
+      <button id="nextTutorial">다음</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="gameOver">
+  <div class="screen" style="max-width:620px">
+    <h1 class="deathTitle">DIE</h1>
+    <p class="subtitle">전투에서 쓰러졌습니다.</p>
+    <div class="reviveBig">팀 공용 부활권 <span id="deathReviveCount">5</span>개</div>
+    <div class="row centerRow">
+      <button id="spectateBtn" class="secondary">👁 관전하기</button>
+      <button id="reviveBtn">✨ 부활하기</button>
+    </div>
+    <button id="homeBtnFromOver" class="secondary" style="margin-top:10px">홈으로</button>
+  </div>
+</div>
+
+<div class="spectateBar" id="spectateBar">
+  <b>👁 관전 중:</b>
+  <span id="spectateName">팀원</span>
+  <button id="spectatePrev" class="secondary">◀ 이전</button>
+  <button id="spectateNext" class="secondary">다음 ▶</button>
+  <button id="spectateReviveBtn">✨ 부활 (<span id="spectateReviveCount">5</span>)</button>
+</div>
+
+<div class="overlay" id="winScreen">
+  <div class="screen" style="max-width:620px">
+    <h1 class="title">DIMENSION CLEAR!</h1>
+    <p class="subtitle">보스2 · 심연의 지배자를 쓰러뜨렸습니다. 파티가 보스2 · 심연의 지배자를 쓰러뜨렸습니다.</p>
+    <div class="row centerRow">
+      <button id="viewEndingBtn">🎬 엔딩 보기</button>
+      <button id="winHomeBtn" class="secondary">홈으로</button>
+    </div>
+  </div>
+</div>
+
+<div class="catNetworkScreen" id="catNetworkScreen">
+  <div class="catStage">
+    <div class="catBubble" id="catNetworkBubble">NO, NO</div>
+    <div class="heroNet noNo" id="networkCat">
+      <div class="electricBolt"></div>
+      <div class="heroHair"></div>
+      <div class="heroHead"></div>
+      <div class="heroEye left"></div>
+      <div class="heroEye right"></div>
+      <div class="heroMouth"></div>
+      <div class="heroBody"></div>
+      <div class="heroArmor"></div>
+      <div class="heroBelt"></div>
+      <div class="heroArm left"></div>
+      <div class="heroArm right"></div>
+      <div class="heroLeg left"></div>
+      <div class="heroLeg right"></div>
+      <div class="heroSword"></div>
+    </div>
+  </div>
+  <div class="catNetworkSub" id="catNetworkSub">방에 연결할 수 없습니다.</div>
+  <div class="hostLeftTime" id="hostLeftTime" style="display:none"></div>
+</div>
+
+<div class="creditsScreen" id="creditsScreen">
+  <div class="creditsFade"></div>
+  <div class="creditsRoll" id="creditsRoll">
+    <h1>BLADE DIMENSIONS</h1>
+
+    <h2>THE JOURNEY</h2>
+    <p>초원의 차원</p>
+    <p>황혼 사막 차원</p>
+    <p>어둠의 성채 차원</p>
+    <p>심연의 차원</p>
+
+    <h2>BOSSES</h2>
+    <p>보스1 · 검은 군주</p>
+    <p>보스2 · 심연의 지배자</p>
+
+    <h2>HERO</h2>
+    <p>차원을 여행한 용사</p>
+    <p>검과 갑옷으로 어둠을 물리치고</p>
+    <p>마지막에는 자연을 모든 차원에 되돌렸습니다.</p>
+
+    <h2>FINAL MISSION</h2>
+    <p>모든 포털에 자연을 되돌리기</p>
+    <p>모든 차원이 다시 살아났습니다.</p>
+
+    <h2>GAME DESIGN</h2>
+    <p>차원 탐험 · 멀티플레이 · 검 전투</p>
+    <p>보스전 · 자연 복원 미션</p>
+
+    <div class="bigThanks">플레이해 주셔서 감사합니다.</div>
+    <div class="theEnd">THE END</div>
+  </div>
+
+  <div class="creditsControls">
+    <button id="creditsHomeBtn">홈으로</button>
+  </div>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script>
+(() => {
+  const $=id=>document.getElementById(id);
+  const canvas=$("game");
+  const engine=new BABYLON.Engine(canvas,true);
+  const scene=new BABYLON.Scene(engine);
+  scene.clearColor=new BABYLON.Color4(.025,.035,.058,1);
+
+  const ui={
+    gold:$("gold"),kills:$("kills"),dimension:$("dimension"),weaponName:$("weaponName"),
+    hpText:$("hpText"),hpFill:$("hpFill"),targetBox:$("targetBox"),targetName:$("targetName"),
+    targetHp:$("targetHp"),targetFill:$("targetFill"),msg:$("msg"),spinCd:$("spinCd"),
+    dashCd:$("dashCd"),shop:$("shop"),weaponList:$("weaponList"),upgradeBtn:$("upgradeBtn"),
+    upgradeInfo:$("upgradeInfo"),armorList:$("armorList"),armorInfo:$("armorInfo"),regenText:$("regenText"),netDot:$("netDot"),netText:$("netText"),roomHud:$("roomHud"),
+    dimHelp:$("dimHelp"),pauseBtn:$("pauseBtn"),pauseState:$("pauseState"),aimDot:$("aimDot"),reviveTickets:$("reviveTickets"),shopTimer:$("shopTimer"),boss2Hud:$("boss2Hud"),boss2HpText:$("boss2HpText"),boss2HpFill:$("boss2HpFill"),natureMission:$("natureMission"),natureMissionSub:$("natureMissionSub"),debugPanel:$("debugPanel"),debugText:$("debugText")
+  };
+
+  const WEAPONS=[
+    {name:"낡은 검",damage:18,speed:.58,range:3.0,price:0,rarity:"일반",cls:"common",color:"#c8ced8"},
+    {name:"철검",damage:29,speed:.52,range:3.15,price:180,rarity:"고급",cls:"uncommon",color:"#63de8b"},
+    {name:"기사검",damage:43,speed:.47,range:3.35,price:520,rarity:"희귀",cls:"rare",color:"#67aaff"},
+    {name:"화염검",damage:64,speed:.42,range:3.6,price:1200,rarity:"영웅",cls:"epic",color:"#cf70ff"},
+    {name:"전설의 검",damage:94,speed:.36,range:3.9,price:2800,rarity:"전설",cls:"legendary",color:"#ffc650"}
+  ];
+  const ARMORS=[
+    {name:"천 갑옷",defense:0.00,price:0,rarity:"일반",cls:"common",color:"#56657a"},
+    {name:"가죽 갑옷",defense:0.08,price:220,rarity:"고급",cls:"uncommon",color:"#8a6547"},
+    {name:"철 갑옷",defense:0.16,price:650,rarity:"희귀",cls:"rare",color:"#8795a8"},
+    {name:"기사 갑옷",defense:0.27,price:1450,rarity:"영웅",cls:"epic",color:"#526d91"},
+    {name:"용사의 갑옷",defense:0.40,price:3200,rarity:"전설",cls:"legendary",color:"#d1a64b"}
+  ];
+  const DIMS=[
+    {name:"초원의 차원",center:new BABYLON.Vector3(220,0,0),ground:"#294d35",enemy:"#e56b6b",enemyName:"초원 좀비",hp:72,dmg:8,speed:1.35,reward:[16,30]},
+    {name:"황혼 사막 차원",center:new BABYLON.Vector3(440,0,0),ground:"#62462d",enemy:"#f0ac60",enemyName:"사막 좀비",hp:135,dmg:12,speed:1.45,reward:[30,54]},
+    {name:"어둠의 성채 차원",center:new BABYLON.Vector3(660,0,0),ground:"#302b43",enemy:"#a66be0",enemyName:"성채 좀비",hp:215,dmg:17,speed:1.55,reward:[52,84]},
+    {name:"심연의 차원",center:new BABYLON.Vector3(880,0,0),ground:"#171022",enemy:"#8745b8",enemyName:"심연 좀비",hp:260,dmg:20,speed:1.65,reward:[65,100]}
+  ];
+  const HUB=new BABYLON.Vector3(0,0,0);
+
+  const save=JSON.parse(localStorage.getItem("bladeDimensionsOnlineSave")||"{}");
+  const state={
+    gold:save.gold??0,kills:save.kills??0,owned:save.owned??[0],equipped:save.equipped??0,
+    upgrades:save.upgrades??[0,0,0,0,0],armorOwned:save.armorOwned??[0],equippedArmor:save.equippedArmor??0,dimKills:save.dimKills??[0,0,0,0],boss1Defeated:save.boss1Defeated??false,boss2Defeated:false,natureMode:false,lastNatureX:null,lastNatureZ:null,naturePlaced:0,natureRadius:9,natureSpawnAcc:0,natureLastBurstX:null,natureLastBurstZ:null,natureGrid:1.8,portalNatureDone:new Set(),endingShown:false,debugOpen:false,debugLastUpdate:0,mouseScreenX:0,mouseScreenY:0,
+    hp:100,maxHp:100,currentDim:-1,currentTarget:null,inGame:false,gameOver:false,
+    blocking:false,attacking:false,dodging:false,yaw:Math.PI,pitch:-.18,zoom:8.5,
+    lastAttack:0,dodgeReady:0,spinReady:0,dashReady:0,velY:0,grounded:true,teleportLock:0,
+    isMultiplayer:false,isHost:false,roomCode:"",nickname:"BladePlayer",started:false,tutorialMode:false,
+    paused:false,pauseReason:"",aimYaw:Math.PI,aimPoint:null,lastDamageAt:0,regenDelay:5,regenPerSecond:4,
+    dead:false,spectating:false,spectateIndex:0,teamRevives:5,shopOpen:false,shopEndsAt:0,
+    settings:{language:"ko",sound:true,sfx:true,maxFps:0,...(save.settings||{})}
+  };
+
+  const net={
+    peer:null,hostConn:null,connections:new Map(),remoteStates:new Map(),lastSend:0,lastEnemyBroadcast:0,
+    roomPlayers:new Map(),intentionalClose:false,joinedSuccessfully:false,joinTimer:null,codeTypingStarted:false,codeWasComplete:false
+  };
+
+  function saveProgress(){
+    localStorage.setItem("bladeDimensionsOnlineSave",JSON.stringify({
+      gold:state.gold,kills:state.kills,owned:state.owned,equipped:state.equipped,
+      upgrades:state.upgrades,armorOwned:state.armorOwned,equippedArmor:state.equippedArmor,dimKills:state.dimKills,boss1Defeated:state.boss1Defeated,settings:state.settings
+    }));
+  }
+  function c(hex){return BABYLON.Color3.FromHexString(hex)}
+  function makeMat(name,hex,em=.0,alpha=1){
+    const m=new BABYLON.StandardMaterial(name,scene);m.diffuseColor=c(hex);
+    if(em)m.emissiveColor=c(hex).scale(em);m.alpha=alpha;return m;
+  }
+
+  const hemi=new BABYLON.HemisphericLight("hemi",new BABYLON.Vector3(0,1,0),scene);hemi.intensity=.9;
+  const sun=new BABYLON.DirectionalLight("sun",new BABYLON.Vector3(-.4,-1,.25),scene);sun.position.set(40,80,-40);sun.intensity=1.05;
+
+  function ground(name,center,size,hex){const g=BABYLON.MeshBuilder.CreateGround(name,{width:size,height:size},scene);g.position.set(center.x,.01,center.z);g.material=makeMat(name+"m",hex);return g}
+  ground("hub",HUB,64,"#273142");DIMS.forEach((d,i)=>ground("dim"+i,d.center,64,d.ground));
+
+  function addDecor(center,hex,type){
+    for(let i=0;i<12;i++){
+      const a=Math.PI*2*i/12,r=25+Math.random()*2,x=center.x+Math.cos(a)*r,z=center.z+Math.sin(a)*r;
+      let p;
+      if(type===0)p=BABYLON.MeshBuilder.CreateCylinder("tree",{height:4+Math.random()*2,diameter:1.4,tessellation:7},scene);
+      else if(type===1){p=BABYLON.MeshBuilder.CreateBox("rock",{size:2.2},scene);p.scaling.y=1.3+Math.random()*1.6}
+      else p=BABYLON.MeshBuilder.CreateCylinder("tower",{height:5+Math.random()*3,diameter:2,tessellation:6},scene);
+      p.position.set(x,type===1?1.7:2.5,z);p.material=makeMat("dec"+Math.random(),hex);
+    }
+  }
+  addDecor(DIMS[0].center,"#436d49",0);addDecor(DIMS[1].center,"#89633d",1);addDecor(DIMS[2].center,"#4b4263",2);addDecor(DIMS[3].center,"#38224f",2);
+
+  const hubCore=BABYLON.MeshBuilder.CreateCylinder("hubCore",{height:.7,diameter:8,tessellation:32},scene);
+  hubCore.position.set(0,.35,0);hubCore.material=makeMat("hubCoreM","#3b4b65");
+
+  function portal(name,pos,hex){
+    const root=new BABYLON.TransformNode(name+"Root",scene);root.position=pos.clone();
+    const ring=BABYLON.MeshBuilder.CreateTorus(name,{diameter:5.1,thickness:.42,tessellation:40},scene);ring.parent=root;ring.rotation.x=Math.PI/2;ring.position.y=3;ring.material=makeMat(name+"rm",hex,.5);
+    const inner=BABYLON.MeshBuilder.CreateDisc(name+"Inner",{radius:2.1,tessellation:40,sideOrientation:BABYLON.Mesh.DOUBLESIDE},scene);inner.parent=root;inner.rotation.y=Math.PI/2;inner.position.y=3;inner.material=makeMat(name+"im",hex,.28,.34);
+    const base=BABYLON.MeshBuilder.CreateCylinder(name+"Base",{height:.45,diameter:5.6,tessellation:32},scene);base.parent=root;base.position.y=.22;base.material=makeMat(name+"bm","#252c3a");
+    return {root,ring,inner,hex};
+  }
+  const hubPortals=[
+    portal("초원 포털",new BABYLON.Vector3(-11,0,10),"#5fe58a"),
+    portal("사막 포털",new BABYLON.Vector3(0,0,14),"#f0ae5c"),
+    portal("성채 포털",new BABYLON.Vector3(11,0,10),"#b36dff"),
+    portal("심연 포털",new BABYLON.Vector3(0,0,-14),"#e05dff")
+  ];
+  const returnPortals=DIMS.map((d,i)=>portal("귀환"+i,new BABYLON.Vector3(d.center.x,0,-23),"#67c9ff"));
+
+  const PORTAL_NATURE_TOTAL=hubPortals.length+returnPortals.length;
+
+  function portalNatureTargetsForCurrentDim(){
+    if(state.currentDim<0){
+      return hubPortals.map((p,i)=>({
+        id:`hub-${i}`,
+        name:["초원 포털","사막 포털","성채 포털","심연 포털"][i]||`포털 ${i+1}`,
+        x:p.root.position.x,
+        z:p.root.position.z
+      }));
+    }
+    const p=returnPortals[state.currentDim];
+    if(!p)return [];
+    return [{
+      id:`return-${state.currentDim}`,
+      name:`${DIMS[state.currentDim].name} 귀환 포털`,
+      x:p.root.position.x,
+      z:p.root.position.z
+    }];
+  }
+
+  function updatePortalNatureMissionText(){
+    if(!state.natureMode)return;
+    const done=state.portalNatureDone.size;
+    ui.natureMissionSub.textContent=
+      `포털 자연화 ${done}/${PORTAL_NATURE_TOTAL} · 각 포털 주변에 자연을 1개 이상 피우세요`;
+  }
+
+  function finishNatureEnding(){
+    if(state.endingShown)return;
+    state.endingShown=true;
+    state.natureMode=false;
+    if(natureAuraRing)natureAuraRing.setEnabled(false);
+    ui.natureMission.style.display="none";
+
+    const title=$("winScreen")?.querySelector("h1");
+    const sub=$("winScreen")?.querySelector(".subtitle");
+    if(title)title.textContent="🌿 자연의 엔딩";
+    if(sub)sub.textContent="모든 포털에 자연을 되돌렸습니다. 모든 차원이 다시 살아났습니다.";
+
+    $("winScreen").style.display="flex";
+    state.gameOver=true;
+
+    if(state.isMultiplayer&&state.isHost){
+      broadcast({type:"natureEnding"});
+    }
+  }
+
+  function applyPortalNatureId(id,announce=true){
+    if(state.portalNatureDone.has(id))return false;
+    state.portalNatureDone.add(id);
+    updatePortalNatureMissionText();
+
+    if(announce){
+      showMessage(`🌿 포털 자연화! ${state.portalNatureDone.size}/${PORTAL_NATURE_TOTAL}`,1100);
+    }
+
+    if(state.isMultiplayer){
+      if(state.isHost){
+        broadcast({
+          type:"portalNatureState",
+          ids:[...state.portalNatureDone]
+        });
+      }else{
+        sendHost({type:"portalNature",id});
+      }
+    }
+
+    if(state.portalNatureDone.size>=PORTAL_NATURE_TOTAL){
+      finishNatureEnding();
+    }
+    return true;
+  }
+
+  function checkPortalNatureAt(x,z){
+    if(!state.natureMode)return;
+    const targets=portalNatureTargetsForCurrentDim();
+    for(const t of targets){
+      if(state.portalNatureDone.has(t.id))continue;
+      const dx=x-t.x,dz=z-t.z;
+      if(dx*dx+dz*dz<=3.2*3.2){
+        applyPortalNatureId(t.id,true);
+      }
+    }
+  }
+
+
+  function makePlayerMesh(name,hex="#62c7ff"){
+    const root=new BABYLON.TransformNode(name+"Root",scene);
+    const skin=makeMat(name+"Skin","#f1c7a1");
+    const tunic=makeMat(name+"Tunic",hex);
+    const dark=makeMat(name+"Dark","#273247");
+    const boot=makeMat(name+"Boot","#3a2b25");
+    const capeMat=makeMat(name+"Cape","#8f2f3c");
+    const hairMat=makeMat(name+"Hair","#3c2d24");
+
+    const torso=BABYLON.MeshBuilder.CreateBox(name+"Torso",{width:1.05,height:1.25,depth:.55},scene);
+    torso.parent=root;torso.position.y=1.95;torso.material=tunic;
+
+    const head=BABYLON.MeshBuilder.CreateSphere(name+"Head",{diameter:.72,segments:12},scene);
+    head.parent=root;head.position.y=2.95;head.material=skin;
+
+    const hair=BABYLON.MeshBuilder.CreateSphere(name+"Hair",{diameter:.76,segments:10},scene);
+    hair.parent=root;hair.position.set(0,3.08,-.02);hair.scaling.y=.55;hair.material=hairMat;
+
+    const leftArm=BABYLON.MeshBuilder.CreateBox(name+"LArm",{width:.32,height:1.18,depth:.36},scene);
+    leftArm.parent=root;leftArm.position.set(-.72,2.0,0);leftArm.material=skin;
+    const rightArm=BABYLON.MeshBuilder.CreateBox(name+"RArm",{width:.32,height:1.18,depth:.36},scene);
+    rightArm.parent=root;rightArm.position.set(.72,2.0,0);rightArm.material=skin;
+
+    const leftLeg=BABYLON.MeshBuilder.CreateBox(name+"LLeg",{width:.4,height:1.25,depth:.44},scene);
+    leftLeg.parent=root;leftLeg.position.set(-.3,.75,0);leftLeg.material=dark;
+    const rightLeg=BABYLON.MeshBuilder.CreateBox(name+"RLeg",{width:.4,height:1.25,depth:.44},scene);
+    rightLeg.parent=root;rightLeg.position.set(.3,.75,0);rightLeg.material=dark;
+
+    const leftBoot=BABYLON.MeshBuilder.CreateBox(name+"LBoot",{width:.43,height:.35,depth:.68},scene);
+    leftBoot.parent=root;leftBoot.position.set(-.3,.17,.12);leftBoot.material=boot;
+    const rightBoot=BABYLON.MeshBuilder.CreateBox(name+"RBoot",{width:.43,height:.35,depth:.68},scene);
+    rightBoot.parent=root;rightBoot.position.set(.3,.17,.12);rightBoot.material=boot;
+
+    const belt=BABYLON.MeshBuilder.CreateBox(name+"Belt",{width:1.1,height:.16,depth:.59},scene);
+    belt.parent=root;belt.position.y=1.45;belt.material=boot;
+
+    const cape=BABYLON.MeshBuilder.CreateBox(name+"Cape",{width:.95,height:1.55,depth:.08},scene);
+    cape.parent=root;cape.position.set(0,1.85,-.34);cape.rotation.x=-.08;cape.material=capeMat;
+
+    // 갑옷 표시용 흉갑과 어깨 보호구
+    const armorChest=BABYLON.MeshBuilder.CreateBox(name+"ArmorChest",{width:1.14,height:1.05,depth:.64},scene);
+    armorChest.parent=root;armorChest.position.set(0,1.98,.02);armorChest.material=makeMat(name+"Armor","#56657a");armorChest.visibility=.45;
+
+    const shoulderL=BABYLON.MeshBuilder.CreateSphere(name+"ShoulderL",{diameter:.52,segments:8},scene);
+    shoulderL.parent=root;shoulderL.position.set(-.68,2.42,0);shoulderL.scaling.y=.6;shoulderL.material=armorChest.material;
+    const shoulderR=BABYLON.MeshBuilder.CreateSphere(name+"ShoulderR",{diameter:.52,segments:8},scene);
+    shoulderR.parent=root;shoulderR.position.set(.68,2.42,0);shoulderR.scaling.y=.6;shoulderR.material=armorChest.material;
+
+    const swordRoot=new BABYLON.TransformNode(name+"SwordRoot",scene);
+    swordRoot.parent=root;swordRoot.position.set(.77,1.72,.1);
+
+    const b=BABYLON.MeshBuilder.CreateBox(name+"Blade",{width:.16,height:1.9,depth:.1},scene);
+    b.parent=swordRoot;b.position.y=.68;
+    const h=BABYLON.MeshBuilder.CreateCylinder(name+"Handle",{height:.62,diameter:.16,tessellation:8},scene);
+    h.parent=swordRoot;h.position.y=-.57;h.material=makeMat(name+"HM","#28231f");
+    const g=BABYLON.MeshBuilder.CreateBox(name+"Guard",{width:.7,height:.11,depth:.16},scene);
+    g.parent=swordRoot;g.position.y=-.29;g.material=makeMat(name+"GM","#d9ba6e");
+
+    return {
+      root,body:torso,torso,head,leftArm,rightArm,leftLeg,rightLeg,
+      swordRoot,blade:b,armorChest,shoulderL,shoulderR
+    };
+  }
+
+  function makeZombieMesh(name,isBoss=false){
+    const root=new BABYLON.TransformNode(name+"Root",scene);
+    const skin=makeMat(name+"ZombieSkin",isBoss?"#76934b":"#7fa76a",isBoss?.12:0);
+    const shirt=makeMat(name+"ZombieShirt",isBoss?"#4d304f":"#5b4a48");
+    const pants=makeMat(name+"ZombiePants","#30373b");
+
+    const torso=BABYLON.MeshBuilder.CreateBox(name+"Torso",{width:isBoss?1.55:1.0,height:isBoss?1.65:1.2,depth:isBoss?.75:.55},scene);
+    torso.parent=root;torso.position.y=isBoss?2.5:1.8;torso.material=shirt;
+
+    const head=BABYLON.MeshBuilder.CreateSphere(name+"Head",{diameter:isBoss?1.05:.7,segments:10},scene);
+    head.parent=root;head.position.y=isBoss?3.75:2.75;head.material=skin;
+
+    const armLen=isBoss?1.5:1.15;
+    const la=BABYLON.MeshBuilder.CreateBox(name+"LA",{width:isBoss?.42:.3,height:armLen,depth:isBoss?.46:.34},scene);
+    la.parent=root;la.material=skin;la.position.set(isBoss?-.95:-.68,isBoss?2.65:2.05,.42);la.rotation.x=Math.PI/2.5;
+    const ra=BABYLON.MeshBuilder.CreateBox(name+"RA",{width:isBoss?.42:.3,height:armLen,depth:isBoss?.46:.34},scene);
+    ra.parent=root;ra.material=skin;ra.position.set(isBoss?.95:.68,isBoss?2.65:2.05,.42);ra.rotation.x=Math.PI/2.5;
+
+    const ll=BABYLON.MeshBuilder.CreateBox(name+"LL",{width:isBoss?.52:.38,height:isBoss?1.55:1.15,depth:isBoss?.52:.4},scene);
+    ll.parent=root;ll.material=pants;ll.position.set(isBoss?-.38:-.28,isBoss?.85:.58,0);
+    const rl=BABYLON.MeshBuilder.CreateBox(name+"RL",{width:isBoss?.52:.38,height:isBoss?1.55:1.15,depth:isBoss?.52:.4},scene);
+    rl.parent=root;rl.material=pants;rl.position.set(isBoss?.38:.28,isBoss?.85:.58,0);
+
+    if(isBoss){
+      const crown=BABYLON.MeshBuilder.CreateCylinder(name+"Crown",{height:.45,diameter:1.2,tessellation:6},scene);
+      crown.parent=root;crown.position.y=4.45;crown.material=makeMat(name+"CrownM","#c99b3d",.2);
+    }
+    return root;
+  }
+
+  const localAvatar=makePlayerMesh("LocalPlayer");
+  localAvatar.root.position.set(0,0,-5);
+
+  const camera=new BABYLON.FreeCamera("camera",new BABYLON.Vector3(0,5,-9),scene);camera.minZ=.1;scene.activeCamera=camera;
+
+  function weaponStats(){const w=WEAPONS[state.equipped],lv=state.upgrades[state.equipped]||0;return {...w,damage:Math.round(w.damage*(1+lv*.12))}}
+  function updateSword(){
+    localAvatar.blade.material=makeMat("bladeM"+Math.random(),WEAPONS[state.equipped].color,.23);
+    ui.weaponName.textContent=`${WEAPONS[state.equipped].name} +${state.upgrades[state.equipped]||0}`;
+  }
+
+  function armorStats(){return ARMORS[state.equippedArmor]||ARMORS[0]}
+  function updateArmorVisual(){
+    const a=armorStats();
+    const m=makeMat("armorMat"+Math.random(),a.color,state.equippedArmor===4?.12:0);
+    localAvatar.armorChest.material=m;localAvatar.shoulderL.material=m;localAvatar.shoulderR.material=m;
+    localAvatar.armorChest.visibility=state.equippedArmor===0?.38:1;
+    localAvatar.shoulderL.visibility=state.equippedArmor===0?.25:1;
+    localAvatar.shoulderR.visibility=state.equippedArmor===0?.25:1;
+  }
+  updateSword();updateArmorVisual();
+
+  const keys={};
+  window.addEventListener("keydown",e=>{
+    if(e.code==="F3"){
+      e.preventDefault();
+      state.debugOpen=!state.debugOpen;
+      updateDebugPanel(true);
+      return;
+    }
+
+    keys[e.code]=true;
+    if(!state.inGame)return;
+    if(e.code==="Escape"&&!e.repeat){e.preventDefault();togglePauseMenu();return}
+    if(state.paused&&e.code!=="KeyB")return;
+    if(e.code==="KeyB")toggleShop();
+    if(e.code==="KeyQ")spinSlash();
+    if(e.code==="KeyR")dashSlash();
+    if(e.code==="KeyE")dodge();
+    if(e.code==="Space"&&!e.repeat){e.preventDefault();jump()}
+    if(e.code==="KeyF"){state.blocking=true;updateBlockPose();}
+  });
+  window.addEventListener("keyup",e=>{keys[e.code]=false;if(e.code==="KeyF"){state.blocking=false;updateBlockPose();}});
+
+  // 카메라 버그 수정: movementX에 의존하지 않고 실제 포인터 좌표 차이를 사용
+  const drag={active:false,id:null,x:0,y:0};
+  canvas.addEventListener("pointerdown",e=>{
+    if(!state.inGame||state.gameOver||state.dead||state.paused||state.shopOpen||ui.shop.style.display==="block")return;
+    if(e.button===0)attack();
+    if(e.button===2){
+      drag.active=true;drag.id=e.pointerId;drag.x=e.clientX;drag.y=e.clientY;
+      try{canvas.setPointerCapture(e.pointerId)}catch(_){}
+      canvas.style.cursor="grabbing";
+      e.preventDefault();
+    }
+  });
+  const pointer={x:canvas.clientWidth/2,y:canvas.clientHeight/2};
+  window.addEventListener("pointermove",e=>{
+    state.mouseScreenX=e.clientX;
+    state.mouseScreenY=e.clientY;
+  });
+
+  canvas.addEventListener("pointermove",e=>{
+    const rect=canvas.getBoundingClientRect();
+    pointer.x=e.clientX-rect.left;pointer.y=e.clientY-rect.top;
+    ui.aimDot.style.left=e.clientX+"px";ui.aimDot.style.top=e.clientY+"px";
+    if(state.inGame)ui.aimDot.style.display="block";
+    updateAimFromPointer();
+    if(!drag.active||e.pointerId!==drag.id)return;
+    const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+    state.yaw-=dx*.0065;state.pitch-=dy*.005;
+    state.pitch=Math.max(-.72,Math.min(.42,state.pitch));
+  });
+  function stopDrag(e){
+    if(!drag.active)return;drag.active=false;canvas.style.cursor="default";
+    try{if(drag.id!==null)canvas.releasePointerCapture(drag.id)}catch(_){}
+    drag.id=null;
+  }
+  canvas.addEventListener("pointerup",stopDrag);canvas.addEventListener("pointercancel",stopDrag);
+  canvas.addEventListener("contextmenu",e=>e.preventDefault());
+  canvas.addEventListener("wheel",e=>{if(!state.inGame)return;e.preventDefault();state.zoom=Math.max(3.2,Math.min(15.5,state.zoom+Math.sign(e.deltaY)*.8))},{passive:false});
+
+
+  function createEnemyHealthUI(owner,isBoss=false){
+    const root=new BABYLON.TransformNode("hpRoot"+Math.random(),scene);
+    root.parent=owner;
+    root.position.y=isBoss?5.35:3.65;
+
+    const back=BABYLON.MeshBuilder.CreatePlane("hpBack",{width:isBoss?3.8:2.7,height:.34},scene);
+    back.parent=root;back.position.z=.02;back.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+    back.material=makeMat("hpBackM"+Math.random(),"#17191f",0,.92);
+
+    const fill=BABYLON.MeshBuilder.CreatePlane("hpFill",{width:isBoss?3.55:2.5,height:.20},scene);
+    fill.parent=root;fill.position.z=0;fill.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+    fill.material=makeMat("hpFillM"+Math.random(),isBoss?"#d94cff":"#e8505b",.15,.98);
+
+    const textPlane=BABYLON.MeshBuilder.CreatePlane("hpTextPlane",{width:isBoss?3.8:2.8,height:.62},scene);
+    textPlane.parent=root;textPlane.position.y=.42;textPlane.billboardMode=BABYLON.Mesh.BILLBOARDMODE_ALL;
+    const tex=new BABYLON.DynamicTexture("hpTextTex"+Math.random(),{width:512,height:96},scene,true);
+    tex.hasAlpha=true;
+    const mat=new BABYLON.StandardMaterial("hpTextMat"+Math.random(),scene);
+    mat.diffuseTexture=tex;mat.emissiveTexture=tex;mat.opacityTexture=tex;mat.disableLighting=true;
+    textPlane.material=mat;
+
+    return {root,back,fill,textPlane,tex,width:isBoss?3.55:2.5};
+  }
+
+  function updateEnemyHealthUI(hpUI,hp,maxHp,name=""){
+    if(!hpUI)return;
+    const pct=Math.max(0,Math.min(1,hp/Math.max(1,maxHp)));
+    hpUI.fill.scaling.x=Math.max(.001,pct);
+    hpUI.fill.position.x=-(hpUI.width*(1-pct)/2);
+    hpUI.tex.clear();
+    hpUI.tex.drawText(`${name}  HP ${Math.max(0,Math.ceil(hp))} / ${maxHp}`,null,65,"bold 38px Arial","white","transparent",true,true);
+  }
+
+  function disposeEnemyHealthUI(hpUI){
+    if(!hpUI)return;
+    try{hpUI.root.getChildMeshes().forEach(m=>m.dispose())}catch(_){}
+    try{hpUI.root.dispose()}catch(_){}
+  }
+
+  const enemies=[];
+  const enemyMeshes=new Map();
+  const spawnTimers=[0,0,0,0];let enemySeq=1;
+
+  function unlocked(i){if(i===0)return true;if(i===1)return state.dimKills[0]>=8;if(i===2)return state.dimKills[1]>=10;if(i===3)return state.boss1Defeated;return false}
+  function setPortalState(){
+    hubPortals.forEach((p,i)=>{
+      const open=unlocked(i);
+      p.ring.material.diffuseColor=open?c(p.hex):new BABYLON.Color3(.15,.15,.17);
+      p.ring.material.emissiveColor=open?c(p.hex).scale(.5):new BABYLON.Color3(.03,.03,.04);
+      p.inner.material.alpha=open?.34:.07;
+    });
+  }
+
+  function clearEnemies(){
+    enemies.splice(0).forEach(e=>{disposeEnemyHealthUI(e.hpUI);e.mesh.dispose()});
+    enemyMeshes.forEach(m=>{disposeEnemyHealthUI(m._healthUI);m.dispose()});enemyMeshes.clear();
+    state.currentTarget=null;
+  }
+
+  function placeLocalForDim(dim,heal=true){
+    localAvatar.root.setEnabled(true);
+    state.currentDim=dim;
+    if(heal)state.hp=state.maxHp;
+    state.velY=0;state.grounded=true;state.teleportLock=performance.now()/1000+1.1;
+    if(dim<0)localAvatar.root.position.set(0,0,-5);
+    else localAvatar.root.position.set(DIMS[dim].center.x,0,18);
+    refreshUI();
+  }
+
+  function teleportLocal(dim){
+    if(state.natureMode&&natureAuraRing)natureAuraRing.setEnabled(false);
+    placeLocalForDim(dim,true);
+    showMessage(dim<0?"차원 로비":`🌌 ${DIMS[dim].name} 입장`,1000);
+    if(state.isMultiplayer){
+      sendPlayerState(performance.now()/1000,true);
+    }
+  }
+  function checkPortals(){
+    const now=performance.now()/1000;if(now<state.teleportLock||state.dead||state.shopOpen)return;
+    if(state.currentDim<0){
+      hubPortals.forEach((p,i)=>{
+        const dx=localAvatar.root.position.x-p.root.position.x,dz=localAvatar.root.position.z-p.root.position.z;
+        if(Math.hypot(dx,dz)<2.15){
+          if(unlocked(i)){
+            teleportLocal(i);
+          }else{
+            let lockMsg="🔒 아직 잠겨 있습니다.";
+            if(i===1)lockMsg=`🔒 초원 좀비 ${Math.max(0,8-state.dimKills[0])}명 더 처치`;
+            if(i===2)lockMsg=`🔒 사막 좀비 ${Math.max(0,10-state.dimKills[1])}명 더 처치`;
+            if(i===3)lockMsg="🔒 보스1 검은 군주를 먼저 처치하세요.";
+            showMessage(lockMsg,1100);
+            state.teleportLock=now+1;localAvatar.root.position.z-=2.4;
+          }
+        }
+      });
+    }else{
+      const p=returnPortals[state.currentDim];
+      if(BABYLON.Vector3.Distance(
+        new BABYLON.Vector3(localAvatar.root.position.x,0,localAvatar.root.position.z),
+        new BABYLON.Vector3(p.root.position.x,0,p.root.position.z)
+      )<2.15)teleportLocal(-1);
+    }
+  }
+
+  function spawnEnemy(isBoss,dim=state.currentDim){
+    if(dim<0)return;
+    if(state.natureMode)return;
+    const d=DIMS[dim];
+    const bossLevel=isBoss?(dim===3?2:1):0;
+    const data=isBoss
+      ?(bossLevel===2
+        ?{hp:1000,dmg:32,speed:1.3,reward:[900,1200],color:"#d94cff",name:"심연의 지배자"}
+        :{hp:950,dmg:28,speed:1.25,reward:[470,650],color:"#ff4f87",name:"검은 군주"})
+      :{hp:d.hp,dmg:d.dmg,speed:d.speed,reward:d.reward,color:d.enemy,name:d.enemyName};
+
+    let px,pz;
+    if(bossLevel===2){
+      px=d.center.x;pz=d.center.z;
+    }else{
+      do{
+        px=d.center.x+(Math.random()*40-20);
+        pz=Math.random()*34-17;
+      }while(dim===state.currentDim&&Math.hypot(px-localAvatar.root.position.x,pz-localAvatar.root.position.z)<8);
+    }
+
+    const m=makeZombieMesh("enemy"+enemySeq,isBoss);m.position.set(px,0,pz);
+    const e={
+      id:"e"+(enemySeq++),mesh:m,hp:data.hp,maxHp:data.hp,damage:data.dmg,speed:data.speed,
+      reward:data.reward,name:data.name,lastHit:0,isBoss,dim,bossLevel,
+      nextSkill:performance.now()/1000+3.5,skillCycle:0,dashUntil:0,dashDir:null,dashHit:false
+    };
+    e.hpUI=createEnemyHealthUI(m,isBoss);
+    updateEnemyHealthUI(e.hpUI,e.hp,e.maxHp,e.name);
+    enemies.push(e);
+
+    if(bossLevel===1)showMessage("⚠ 보스1 · 검은 군주 등장!",1800);
+    if(bossLevel===2)showMessage("⚠ 보스2 · 심연의 지배자 등장! HP 1000",2200);
+  }
+
+  function updateAimFromPointer(){
+    if(!state.inGame)return;
+    const pick=scene.pick(pointer.x,pointer.y,m=>m.name==="hub"||/^dim\d$/.test(m.name));
+    if(pick&&pick.hit&&pick.pickedPoint){
+      state.aimPoint=pick.pickedPoint.clone();
+      const dx=state.aimPoint.x-localAvatar.root.position.x;
+      const dz=state.aimPoint.z-localAvatar.root.position.z;
+      if(Math.hypot(dx,dz)>.35)state.aimYaw=Math.atan2(dx,dz);
+    }else{
+      state.aimYaw=state.yaw;
+    }
+  }
+  function updateBlockPose(){
+    if(state.dead||state.shopOpen)return;
+    if(state.attacking)return;
+    if(state.blocking){
+      // 검을 얼굴 앞에 세우고 양팔을 안쪽으로 모으는 방어 자세
+      localAvatar.swordRoot.position.set(.18,2.0,.42);
+      localAvatar.swordRoot.rotation.x=.08;
+      localAvatar.swordRoot.rotation.y=0;
+      localAvatar.swordRoot.rotation.z=-.12;
+      localAvatar.rightArm.rotation.z=.55;
+      localAvatar.rightArm.rotation.x=-.25;
+      localAvatar.leftArm.rotation.z=-.55;
+      localAvatar.leftArm.rotation.x=-.25;
+    }else{
+      localAvatar.swordRoot.position.set(.77,1.72,.1);
+      localAvatar.rightArm.rotation.set(0,0,0);
+      localAvatar.leftArm.rotation.set(0,0,0);
+      updateSwordAim();
+    }
+  }
+  function updateSwordAim(){
+    if(state.attacking||state.blocking)return;
+    const rel=normalizeAngle(state.aimYaw-localAvatar.root.rotation.y);
+    localAvatar.swordRoot.position.set(.77,1.72,.1);
+    localAvatar.swordRoot.rotation.x=1.12;
+    localAvatar.swordRoot.rotation.y=rel;
+    localAvatar.swordRoot.rotation.z=-.18;
+  }
+  function normalizeAngle(a){while(a>Math.PI)a-=Math.PI*2;while(a<-Math.PI)a+=Math.PI*2;return a}
+  function forward(){return new BABYLON.Vector3(Math.sin(state.yaw),0,Math.cos(state.yaw)).normalize()}
+  function right(){return new BABYLON.Vector3(Math.cos(state.yaw),0,-Math.sin(state.yaw)).normalize()}
+
+  function animateLocalAttack(){
+    if(state.attacking)return;state.attacking=true;localAvatar.swordRoot.rotation.z=-1.15;localAvatar.swordRoot.rotation.x=.35;
+    setTimeout(()=>{state.attacking=false;updateBlockPose()},180);
+  }
+
+  function attack(){
+    const now=performance.now()/1000,w=weaponStats();if(now-state.lastAttack<w.speed||state.gameOver||state.dead||state.shopOpen||state.currentDim<0)return;
+    state.lastAttack=now;animateLocalAttack();tone(155,.055,.03);
+    if(state.isMultiplayer&&!state.isHost){
+      sendHost({type:"attack",pos:vec(localAvatar.root.position),yaw:state.aimYaw,damage:w.damage,range:w.range,dim:state.currentDim});
+    }else applyAttack(vec(localAvatar.root.position),state.aimYaw,w.damage,w.range,state.currentDim);
+  }
+
+  function applyAttack(pos,yaw,damage,range,dim=state.currentDim){
+    const p=new BABYLON.Vector3(pos.x,pos.y,pos.z),f=new BABYLON.Vector3(Math.sin(yaw),0,Math.cos(yaw)).normalize();
+    enemies.slice().forEach(e=>{
+      if(e.dim!==dim)return;
+      const to=e.mesh.position.subtract(p);to.y=0;const dist=to.length();
+      if(dist<=range&&BABYLON.Vector3.Dot(f,to.normalize())>.1)damageEnemy(e,damage);
+    });
+  }
+  function damageEnemy(e,amount){e.hp-=amount;updateEnemyHealthUI(e.hpUI,e.hp,e.maxHp,e.name);if(e.hp<=0)killEnemy(e)}
+  function killEnemy(e){
+    const idx=enemies.indexOf(e);if(idx>=0)enemies.splice(idx,1);
+    disposeEnemyHealthUI(e.hpUI);e.mesh.dispose();
+    const gain=Math.floor(e.reward[0]+Math.random()*(e.reward[1]-e.reward[0]+1));state.gold+=gain;state.kills++;
+
+    if(e.dim>=0&&!e.isBoss)state.dimKills[e.dim]=(state.dimKills[e.dim]||0)+1;
+    if(e.dim===0&&state.dimKills[0]===8)showMessage("🌌 황혼 사막 차원 개방!",1800);
+    if(e.dim===1&&state.dimKills[1]===10)showMessage("🌌 어둠의 성채 차원 개방!",1800);
+
+    if(e.isBoss&&e.bossLevel===1){
+      state.boss1Defeated=true;
+      showMessage("🌌 보스1 처치! 로비 맨 뒤에 '심연의 차원'이 열렸습니다!",2600);
+      if(state.isMultiplayer&&state.isHost)broadcastRoomState();
+    }
+
+    if(e.isBoss&&e.bossLevel===2){
+      state.boss2Defeated=true;
+      startNatureMission();
+      if(state.isMultiplayer&&state.isHost)broadcast({type:"natureMission"});
+    }
+
+    saveProgress();setPortalState();refreshUI();
+    if(state.isMultiplayer&&state.isHost)broadcastRoomState();
+  }
+
+  function spinSlash(){
+    const now=performance.now()/1000;
+    if(now<state.spinReady||state.currentDim<0||state.gameOver||state.dead||state.shopOpen)return;
+
+    state.spinReady=now+8;
+    const dmg=Math.round(weaponStats().damage*.9);
+    const duration=.65;
+    const startRot=localAvatar.root.rotation.y;
+    const startTime=performance.now()/1000;
+    const hitIds=new Set();
+    let clientSent=false;
+
+    state.attacking=true;
+    state.blocking=false;
+
+    // 검을 옆으로 뻗어서 실제 회전 공격 자세
+    localAvatar.swordRoot.position.set(.9,1.72,.15);
+    localAvatar.swordRoot.rotation.x=.15;
+    localAvatar.swordRoot.rotation.y=0;
+    localAvatar.swordRoot.rotation.z=-1.35;
+    localAvatar.rightArm.rotation.z=.9;
+    localAvatar.leftArm.rotation.z=-.35;
+
+    function hitNearby(){
+      if(state.isMultiplayer&&!state.isHost){
+        if(clientSent)return;
+        clientSent=true;
+        sendHost({
+          type:"skill",
+          kind:"spin",
+          pos:vec(localAvatar.root.position),
+          damage:dmg,
+          dim:state.currentDim
+        });
+        return;
+      }
+
+      enemies.slice().forEach(e=>{
+        if(e.dim!==state.currentDim||hitIds.has(e.id))return;
+        if(BABYLON.Vector3.Distance(localAvatar.root.position,e.mesh.position)<=4.6){
+          hitIds.add(e.id);
+          damageEnemy(e,dmg);
+        }
+      });
+    }
+
+    let hit1=false,hit2=false,hit3=false;
+
+    function spinFrame(){
+      const t=(performance.now()/1000-startTime)/duration;
+
+      if(!hit1&&t>=.16){hit1=true;hitNearby()}
+      if(!hit2&&t>=.48){hit2=true;hitNearby()}
+      if(!hit3&&t>=.78){hit3=true;hitNearby()}
+
+      if(t>=1){
+        localAvatar.root.rotation.y=startRot+Math.PI*2;
+        state.attacking=false;
+        updateBlockPose();
+        return;
+      }
+
+      localAvatar.root.rotation.y=startRot+(Math.PI*2*t);
+      requestAnimationFrame(spinFrame);
+    }
+
+    requestAnimationFrame(spinFrame);
+    showMessage("회전 베기!",650);
+    tone(115,.12,.035);
+  }
+  function dashSlash(){
+    const now=performance.now()/1000;if(now<state.dashReady||state.currentDim<0||state.gameOver||state.dead||state.shopOpen)return;state.dashReady=now+6;
+    const f=new BABYLON.Vector3(Math.sin(state.aimYaw),0,Math.cos(state.aimYaw)).normalize(),start=localAvatar.root.position.clone();localAvatar.root.position.addInPlace(f.scale(6.5));clampArena();
+    const dmg=Math.round(weaponStats().damage*1.35);
+    if(state.isMultiplayer&&!state.isHost)sendHost({type:"skill",kind:"dash",pos:vec(start),yaw:state.aimYaw,damage:dmg,dim:state.currentDim});
+    else enemies.slice().forEach(e=>{if(e.dim!==state.currentDim)return;const a=e.mesh.position.subtract(start);a.y=0;const along=BABYLON.Vector3.Dot(a,f),side=a.subtract(f.scale(along)).length();if(along>=0&&along<=7.5&&side<2.1)damageEnemy(e,dmg)});
+    showMessage("돌진 베기!",600);tone(95,.14,.04);
+  }
+  function dodge(){
+    const now=performance.now()/1000;if(now<state.dodgeReady||state.gameOver||state.dead||state.shopOpen)return;state.dodgeReady=now+1.25;state.dodging=true;
+    let d=forward().scale(-1);if(keys.KeyW)d=forward();else if(keys.KeyS)d=forward().scale(-1);else if(keys.KeyA)d=right().scale(-1);else if(keys.KeyD)d=right();
+    localAvatar.root.position.addInPlace(d.scale(4));clampArena();setTimeout(()=>state.dodging=false,300);
+  }
+  function jump(){if(!state.grounded||state.gameOver||state.dead||state.shopOpen)return;state.velY=7.2;state.grounded=false;tone(210,.04,.018)}
+
+  function allPlayerPositions(){
+    const arr=[];
+    if(!state.dead&&!state.shopOpen){
+      arr.push({id:"local",pos:localAvatar.root.position,hp:state.hp,local:true,dim:state.currentDim,dead:false,shopOpen:false});
+    }
+    if(state.isHost)net.remoteStates.forEach((s,id)=>{
+      if(!s.dead&&!s.shopOpen){
+        arr.push({id,pos:new BABYLON.Vector3(s.x,s.y,s.z),hp:s.hp,local:false,dim:s.dim,dead:!!s.dead,shopOpen:!!s.shopOpen});
+      }
+    });
+    return arr;
+  }
+
+
+  function setPaused(paused,reason="menu",sync=true){
+    state.paused=paused;state.pauseReason=paused?reason:"";
+    ui.pauseState.style.display=paused?"block":"none";
+    ui.pauseState.textContent=state.settings.language==="en"?"⏸ BATTLE PAUSED":"⏸ 전투 정지 중";
+    if(sync&&state.isMultiplayer){
+      if(state.isHost)broadcast({type:"pauseState",paused,reason});
+      else sendHost({type:"pauseRequest",paused,reason});
+    }
+  }
+  function togglePauseMenu(force){
+    if(!state.inGame||state.gameOver||state.dead)return;
+    const open=force!==undefined?force:$("pauseMenu").style.display!=="flex";
+    if(open){
+      if(state.shopOpen)toggleShop(false);
+      setPaused(true,"menu",true);
+      $("pauseMenu").style.display="flex";
+    }else{
+      $("pauseMenu").style.display="none";
+      if($("settingsScreen").style.display!=="flex"&&$("bugScreen").style.display!=="flex")setPaused(false,"",true);
+    }
+  }
+
+
+  function createShockwaveVisual(pos){
+    const ring=BABYLON.MeshBuilder.CreateTorus("bossShockwave",{diameter:2.2,thickness:.16,tessellation:48},scene);
+    ring.position.set(pos.x,.14,pos.z);
+    ring.material=makeMat("shockwaveM"+Math.random(),"#d94cff",.8,.85);
+    const start=performance.now()/1000;
+    const animate=()=>{
+      const t=(performance.now()/1000-start)/.7;
+      if(t>=1){ring.dispose();return}
+      ring.scaling.setAll(1+t*8);
+      ring.material.alpha=.85*(1-t);
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }
+
+  function damagePartyTarget(target,amount,e){
+    if(!target)return;
+    if(target.local)takeLocalDamage(amount,e);
+    else sendTo(target.id,{type:"damage",amount});
+  }
+
+  function useBoss2Skill(e,target,now){
+    if(!target||now<e.nextSkill)return;
+    const skill=e.skillCycle%3;
+    e.skillCycle++;
+    e.nextSkill=now+6.5;
+
+    if(skill===0){
+      if(state.currentDim===3)showMessage("💥 보스2 스킬: 심연 충격파!",1000);
+      createShockwaveVisual(e.mesh.position);
+      const party=allPlayerPositions();
+      party.forEach(p=>{
+        if(p.dim!==3)return;
+        const dx=p.pos.x-e.mesh.position.x,dz=p.pos.z-e.mesh.position.z;
+        if(Math.hypot(dx,dz)<=9)damagePartyTarget(p,22,e);
+      });
+    }else if(skill===1){
+      if(state.currentDim===3)showMessage("⚡ 보스2 스킬: 그림자 돌진!",1000);
+      const dir=target.pos.subtract(e.mesh.position);dir.y=0;
+      if(dir.length()>.1){
+        e.dashDir=dir.normalize();e.dashUntil=now+.9;e.dashHit=false;
+      }
+    }else{
+      if(state.currentDim===3)showMessage("🧟 보스2 스킬: 심연 좀비 소환!",1000);
+      spawnEnemy(false,3);spawnEnemy(false,3);
+    }
+  }
+
+  function updateBoss2Dash(e,target,now,dt){
+    if(!e.dashUntil||now>=e.dashUntil)return false;
+    if(e.dashDir){
+      e.mesh.position.addInPlace(e.dashDir.scale(10.5*dt));
+      e.mesh.rotation.y=Math.atan2(e.dashDir.x,e.dashDir.z);
+    }
+    if(target&&!e.dashHit){
+      const dx=target.pos.x-e.mesh.position.x,dz=target.pos.z-e.mesh.position.z;
+      if(Math.hypot(dx,dz)<2.5){
+        e.dashHit=true;
+        damagePartyTarget(target,30,e);
+      }
+    }
+    return true;
+  }
+
+  function updateEnemies(dt){
+    if(state.isMultiplayer&&!state.isHost){state.currentTarget=nearestClientEnemy();return}
+    let near=null,nd=Infinity;
+    const party=allPlayerPositions();
+    enemies.forEach(e=>{
+      let target=null,td=Infinity;
+      party.forEach(p=>{
+        if(p.dim!==e.dim)return;
+        const d=BABYLON.Vector3.Distance(e.mesh.position,p.pos);
+        if(d<td){td=d;target=p}
+      });
+      if(target){
+        const to=target.pos.subtract(e.mesh.position);to.y=0;
+        if(target.local&&e.dim===state.currentDim&&td<nd){nd=td;near=e}
+        const now=performance.now()/1000;
+
+        if(e.bossLevel===2){
+          useBoss2Skill(e,target,now);
+          if(updateBoss2Dash(e,target,now,dt))return;
+        }
+
+        if(td>1.8+(e.isBoss?.55:0)){
+          const dir=to.normalize();e.mesh.position.addInPlace(dir.scale(e.speed*dt));e.mesh.rotation.y=Math.atan2(dir.x,dir.z);
+        }else{
+          if(now-e.lastHit>(e.isBoss?1.0:1.25)){
+            e.lastHit=now;
+            if(target.local)takeLocalDamage(e.damage,e);
+            else sendTo(target.id,{type:"damage",amount:e.damage});
+          }
+        }
+      }
+    });
+    state.currentTarget=near&&nd<12?near:null;
+  }
+
+  function nearestClientEnemy(){
+    let best=null,bd=Infinity;
+    enemyMeshes.forEach((m,id)=>{if(m.metadata?.dim!==state.currentDim)return;const d=BABYLON.Vector3.Distance(localAvatar.root.position,m.position);if(d<bd){bd=d;best={id,mesh:m,hp:m.metadata?.hp||1,maxHp:m.metadata?.maxHp||1,name:m.metadata?.name||"적",isBoss:m.metadata?.isBoss||false}}});
+    return best&&bd<12?best:null;
+  }
+
+  function takeLocalDamage(amount,e){
+    if(state.dodging||state.dead||state.shopOpen)return;
+    let dmg=amount;
+    if(state.blocking&&e){
+      const to=e.mesh.position.subtract(localAvatar.root.position);to.y=0;
+      if(BABYLON.Vector3.Dot(forward(),to.normalize())>0)dmg*=.23;
+    }
+    dmg*=1-armorStats().defense;
+    dmg=Math.max(1,dmg);
+    state.hp=Math.max(0,state.hp-dmg);
+    state.lastDamageAt=performance.now()/1000;
+    tone(68,.075,.04);
+    if(state.hp<=0)handleDeath();
+  }
+
+  function handleDeath(){
+    if(state.dead)return;
+    state.dead=true;state.spectating=false;state.hp=0;state.blocking=false;
+    if(state.shopOpen)toggleShop(false);
+    localAvatar.root.setEnabled(false);
+    $("gameOver").style.display="flex";
+    $("spectateBtn").style.display=state.isMultiplayer?"inline-block":"none";
+    updateReviveUI();
+    if(state.isMultiplayer)sendPlayerState(performance.now()/1000,true);
+  }
+
+  function updateReviveUI(){
+    ui.reviveTickets.textContent=state.teamRevives;
+    $("deathReviveCount").textContent=state.teamRevives;
+    $("spectateReviveCount").textContent=state.teamRevives;
+    $("reviveBtn").disabled=state.teamRevives<=0;
+    $("spectateReviveBtn").disabled=state.teamRevives<=0;
+  }
+
+  function respawnLocal(){
+    state.dead=false;state.spectating=false;state.hp=state.maxHp;state.lastDamageAt=performance.now()/1000;
+    localAvatar.root.setEnabled(true);
+    const dim=state.currentDim;
+    placeLocalForDim(dim,true);
+    $("gameOver").style.display="none";
+    $("spectateBar").style.display="none";
+    if(state.isMultiplayer)sendPlayerState(performance.now()/1000,true);
+    showMessage("✨ 부활!",800);
+  }
+
+  function requestRevive(){
+    if(!state.dead||state.teamRevives<=0)return;
+    if(!state.isMultiplayer){
+      state.teamRevives--;updateReviveUI();respawnLocal();return;
+    }
+    if(state.isHost){
+      state.teamRevives--;
+      updateReviveUI();broadcastRoomState();respawnLocal();
+    }else{
+      $("reviveBtn").disabled=true;$("spectateReviveBtn").disabled=true;
+      sendHost({type:"reviveRequest"});
+    }
+  }
+
+  function getSpectateTargets(){
+    const arr=[];
+    net.remoteStates.forEach((s,id)=>{
+      if(!s.dead)arr.push({id,name:s.name||"팀원",...s});
+    });
+    return arr;
+  }
+
+  function startSpectate(){
+    if(!state.dead)return;
+    const targets=getSpectateTargets();
+    if(!targets.length){
+      showMessage("관전할 살아있는 팀원이 없습니다.",1000);
+      return;
+    }
+    state.spectating=true;state.spectateIndex=0;
+    $("gameOver").style.display="none";$("spectateBar").style.display="flex";
+    updateSpectateLabel();
+  }
+
+  function cycleSpectate(dir){
+    const t=getSpectateTargets();if(!t.length)return;
+    state.spectateIndex=(state.spectateIndex+dir+t.length)%t.length;updateSpectateLabel();
+  }
+
+  function updateSpectateLabel(){
+    const t=getSpectateTargets();
+    if(!t.length){$("spectateName").textContent="관전할 팀원 없음";return}
+    state.spectateIndex=Math.min(state.spectateIndex,t.length-1);
+    $("spectateName").textContent=t[state.spectateIndex].name||"팀원";
+  }
+
+  function updateHealthRegen(dt){
+    if(!state.inGame||state.gameOver||state.paused||state.hp<=0||state.hp>=state.maxHp)return;
+    const since=performance.now()/1000-state.lastDamageAt;
+    if(since>=state.regenDelay){
+      state.hp=Math.min(state.maxHp,state.hp+state.regenPerSecond*dt);
+    }
+  }
+
+  function arenaCenter(){return state.currentDim<0?HUB:DIMS[state.currentDim].center}
+  function clampArena(){const cc=arenaCenter(),half=28;localAvatar.root.position.x=Math.max(cc.x-half,Math.min(cc.x+half,localAvatar.root.position.x));localAvatar.root.position.z=Math.max(cc.z-half,Math.min(cc.z+half,localAvatar.root.position.z))}
+  function movePlayer(dt){
+    if(!state.inGame||state.gameOver||state.dead||state.paused||state.shopOpen||ui.shop.style.display==="block")return;
+    let v=BABYLON.Vector3.Zero(),f=forward(),r=right();
+    if(keys.KeyW)v.addInPlace(f);if(keys.KeyS)v.subtractInPlace(f);if(keys.KeyD)v.addInPlace(r);if(keys.KeyA)v.subtractInPlace(r);
+    if(v.lengthSquared()>.01){v.normalize();localAvatar.root.position.addInPlace(v.scale((keys.ShiftLeft||keys.ShiftRight?8.7:5.7)*dt));localAvatar.root.rotation.y=Math.atan2(v.x,v.z)}
+    state.velY-=18*dt;localAvatar.root.position.y+=state.velY*dt;if(localAvatar.root.position.y<=0){localAvatar.root.position.y=0;state.velY=0;state.grounded=true}
+    clampArena();checkPortals();
+  }
+  function updateCamera(){
+    if(state.dead&&state.spectating){
+      const targets=getSpectateTargets();
+      if(targets.length){
+        state.spectateIndex=Math.min(state.spectateIndex,targets.length-1);
+        const s=targets[state.spectateIndex];
+        const target=new BABYLON.Vector3(s.x,s.y+1.2,s.z);
+        const z=state.zoom;
+        const off=new BABYLON.Vector3(-Math.sin(state.yaw)*z,3.5,-Math.cos(state.yaw)*z);
+        camera.position=BABYLON.Vector3.Lerp(camera.position,target.add(off),.18);
+        camera.setTarget(target);
+        updateSpectateLabel();
+        return;
+      }
+    }
+    const cp=Math.cos(state.pitch),sp=Math.sin(state.pitch),z=state.zoom;
+    const off=new BABYLON.Vector3(-Math.sin(state.yaw)*z*cp,3.2+(-sp*z),-Math.cos(state.yaw)*z*cp);
+    const target=localAvatar.root.position.add(new BABYLON.Vector3(0,1.15,0));
+    camera.position=BABYLON.Vector3.Lerp(camera.position,target.add(off),.2);camera.setTarget(target);
+  }
+  function animatePortals(t){[...hubPortals,...returnPortals].forEach((p,i)=>{p.ring.rotation.z=t*.35+i*.6;p.inner.scaling.setAll(1+Math.sin(t*2+i)*.04)})}
+
+  // ---------- 네트워크 ----------
+  function vec(v){return{x:v.x,y:v.y,z:v.z}}
+  function makeRoomCode(){
+    const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s;
+  }
+  function setNetStatus(text,mode=""){
+    ui.netText.textContent=text;ui.netDot.className="netDot "+(mode==="online"?"online":mode==="warn"?"warn":"");
+  }
+
+
+  const ROOM_HISTORY_KEY="bladeRoomHistoryV1";
+
+  function loadRoomHistory(){
+    try{return JSON.parse(localStorage.getItem(ROOM_HISTORY_KEY)||"{}")}catch(_){return {}}
+  }
+  function getRoomRecord(code){
+    if(!code)return null;
+    return loadRoomHistory()[String(code).toUpperCase()]||null;
+  }
+  function saveRoomRecord(code,patch={}){
+    if(!code)return;
+    const key=String(code).toUpperCase();
+    const all=loadRoomHistory();
+    all[key]={...(all[key]||{}),...patch,code:key,updatedAt:Date.now()};
+    localStorage.setItem(ROOM_HISTORY_KEY,JSON.stringify(all));
+  }
+  function markRoomOpen(code,createdByThisApp=false){
+    const old=getRoomRecord(code)||{};
+    saveRoomRecord(code,{
+      existed:true,
+      status:"open",
+      firstSeenAt:old.firstSeenAt||Date.now(),
+      createdAt:createdByThisApp?(old.createdAt||Date.now()):old.createdAt,
+      leftAt:null
+    });
+  }
+  function markRoomGone(code,when=Date.now()){
+    const old=getRoomRecord(code)||{};
+    saveRoomRecord(code,{
+      existed:true,
+      status:"closed",
+      firstSeenAt:old.firstSeenAt||when,
+      leftAt:when
+    });
+  }
+  function formatRoomTime(ts){
+    return new Date(ts||Date.now()).toLocaleTimeString("ko-KR",{
+      hour:"numeric",minute:"2-digit",second:"2-digit"
+    });
+  }
+  function showJoinFailureForCode(code){
+    const rec=getRoomRecord(code);
+    if(rec?.existed){
+      const leftAt=rec.leftAt||Date.now();
+      markRoomGone(code,leftAt);
+      showCatNetworkAnimation("room-gone",{code,leftAt});
+    }else{
+      showCatNetworkAnimation("room-missing",{code});
+    }
+  }
+
+  function showCatNetworkAnimation(type,info={}){
+    const screen=$("catNetworkScreen"),cat=$("networkCat"),bubble=$("catNetworkBubble"),
+          sub=$("catNetworkSub"),timeLine=$("hostLeftTime");
+    if(!screen||!cat||!bubble||!sub||!timeLine)return;
+
+    clearTimeout(showCatNetworkAnimation.timer);
+    screen.style.display="flex";
+    cat.classList.remove("noNo","shock","electric");
+    timeLine.style.display="none";
+    timeLine.textContent="";
+    void cat.offsetHeight;
+
+    if(type==="room-gone"){
+      const leaveTime=formatRoomTime(info.leftAt);
+      cat.classList.add("electric");
+      bubble.innerHTML="코드를 다 치기 전에 방장이 나갔어요.<br>정말 아쉬워요";
+      sub.textContent="전에 존재했던 방이 지금은 닫혀 있습니다.";
+      timeLine.style.display="block";
+      timeLine.textContent=`방장이 방을 만들고 ${leaveTime}에 방을 떠났어요.`;
+    }else if(type==="room-missing"){
+      cat.classList.add("noNo");
+      bubble.textContent="방이 없어요";
+      sub.textContent="이 앱에서 존재했던 기록이 없는 방 코드입니다.";
+    }else if(type==="host-left"){
+      cat.classList.add("shock");
+      bubble.textContent="방장이 나갔어요!";
+      sub.textContent="멀티플레이 연결이 종료되었습니다.";
+      if(info.leftAt){
+        timeLine.style.display="block";
+        timeLine.textContent=`방장이 방을 만들고 ${formatRoomTime(info.leftAt)}에 방을 떠났어요.`;
+      }
+    }else{
+      cat.classList.add("noNo");
+      bubble.textContent="방이 없어요";
+      sub.textContent="방에 연결할 수 없습니다.";
+    }
+
+    const duration=type==="room-gone"?4300:(type==="host-left"?3400:2700);
+    showCatNetworkAnimation.timer=setTimeout(()=>{
+      screen.style.display="none";
+
+      if(type==="host-left"){
+        closeNetwork();
+        hideAllOverlays();
+        $("home").style.display="flex";
+      }else{
+        net.intentionalClose=true;
+        try{net.hostConn?.close()}catch(_){}
+        try{net.peer?.destroy()}catch(_){}
+        net.hostConn=null;net.peer=null;
+        state.isMultiplayer=false;state.isHost=false;state.roomCode="";
+        setNetStatus("오프라인");
+        hideAllOverlays();
+        $("joinScreen").style.display="flex";
+        $("joinStatus").textContent=type==="room-gone"
+          ?"전에 있던 방이 닫혔습니다. 다른 방 코드를 입력해주세요."
+          :"방이 없습니다. 방 코드를 다시 확인해주세요.";
+        setTimeout(()=>{net.intentionalClose=false},250);
+      }
+    },duration);
+  }
+
+  function closeNetwork(){
+    const closingCode=state.roomCode;
+    const closingWasHost=!!(state.isMultiplayer&&state.isHost&&closingCode);
+    if(closingWasHost)markRoomGone(closingCode,Date.now());
+    net.intentionalClose=true;
+    net.joinedSuccessfully=false;
+    if(net.joinTimer){clearTimeout(net.joinTimer);net.joinTimer=null}
+    try{net.hostConn?.close()}catch(_){}
+    net.connections.forEach(c=>{try{c.close()}catch(_){}});net.connections.clear();
+    try{net.peer?.destroy()}catch(_){}
+    net.peer=null;net.hostConn=null;net.remoteStates.clear();net.roomPlayers.clear();
+    state.isMultiplayer=false;state.isHost=false;state.roomCode="";setNetStatus("오프라인");ui.roomHud.textContent="혼자 연습";
+    renderRemotePlayers();
+    setTimeout(()=>{net.intentionalClose=false},300);
+  }
+  function setupConn(conn,isIncoming){
+    if(isIncoming)net.connections.set(conn.peer,conn);else net.hostConn=conn;
+    conn.on("open",()=>{
+      if(state.isHost){
+        net.roomPlayers.set(conn.peer,{id:conn.peer,name:"참가자",host:false});
+        conn.send({type:"requestHello"});
+      }else{
+        conn.send({type:"hello",name:state.nickname});
+      }
+      renderLobby();
+    });
+    conn.on("data",data=>handleNetData(conn,data));
+    conn.on("close",()=>{
+      const wasHostConnection=!isIncoming&&!state.isHost;
+      net.connections.delete(conn.peer);net.roomPlayers.delete(conn.peer);net.remoteStates.delete(conn.peer);
+      renderLobby();renderRemotePlayers();
+      if(wasHostConnection&&!net.intentionalClose&&net.joinedSuccessfully){
+        const closedCode=state.roomCode;
+        const leftAt=Date.now();
+        markRoomGone(closedCode,leftAt);
+        net.joinedSuccessfully=false;
+        showCatNetworkAnimation("host-left",{code:closedCode,leftAt});
+      }
+    });
+    conn.on("error",()=>{
+      if(!isIncoming&&!state.isHost&&!net.intentionalClose&&!net.joinedSuccessfully){
+        showJoinFailureForCode(state.roomCode);
+      }
+    });
+  }
+  function handleNetData(conn,d){
+    if(!d||!d.type)return;
+    if(state.isHost){
+      if(d.type==="hello"){
+        net.roomPlayers.set(conn.peer,{id:conn.peer,name:(d.name||"참가자").slice(0,14),host:false});
+        broadcastRoomState();renderLobby();
+      }else if(d.type==="playerState"){
+        net.remoteStates.set(conn.peer,{...d.state,name:net.roomPlayers.get(conn.peer)?.name||"참가자"});
+        broadcastExcept(conn.peer,{type:"remoteState",id:conn.peer,state:net.remoteStates.get(conn.peer)});
+      }else if(d.type==="attack"){
+        applyAttack(d.pos,d.yaw,Math.min(160,Math.max(1,d.damage||10)),Math.min(5,Math.max(1,d.range||3)),d.dim);
+      }else if(d.type==="pauseRequest"){
+        setPaused(!!d.paused,d.reason||"menu",false);
+        broadcast({type:"pauseState",paused:state.paused,reason:state.pauseReason});
+      }else if(d.type==="portalNature"){
+        if(typeof d.id==="string" && !state.portalNatureDone.has(d.id)){
+          state.portalNatureDone.add(d.id);
+          broadcast({type:"portalNatureState",ids:[...state.portalNatureDone]});
+          updatePortalNatureMissionText();
+          if(state.portalNatureDone.size>=PORTAL_NATURE_TOTAL)finishNatureEnding();
+        }
+      }else if(d.type==="reviveRequest"){
+        const remote=net.remoteStates.get(conn.peer);
+        if(remote?.dead&&state.teamRevives>0){
+          state.teamRevives--;
+          updateReviveUI();
+          sendTo(conn.peer,{type:"reviveApproved",remaining:state.teamRevives});
+          broadcastRoomState();
+        }else{
+          sendTo(conn.peer,{type:"reviveDenied",remaining:state.teamRevives});
+        }
+      }else if(d.type==="skill"){
+        const p=new BABYLON.Vector3(d.pos.x,d.pos.y,d.pos.z);
+        if(d.kind==="spin")enemies.slice().forEach(e=>{if(e.dim===d.dim&&BABYLON.Vector3.Distance(p,e.mesh.position)<=4.7)damageEnemy(e,Math.min(180,d.damage||20))});
+        if(d.kind==="dash"){const f=new BABYLON.Vector3(Math.sin(d.yaw),0,Math.cos(d.yaw)).normalize();enemies.slice().forEach(e=>{if(e.dim!==d.dim)return;const a=e.mesh.position.subtract(p);a.y=0;const along=BABYLON.Vector3.Dot(a,f),side=a.subtract(f.scale(along)).length();if(along>=0&&along<=7.7&&side<2.2)damageEnemy(e,Math.min(220,d.damage||25))})}
+      }
+    }else{
+      if(d.type==="requestHello")conn.send({type:"hello",name:state.nickname});
+      else if(d.type==="roomState"){
+        state.dimKills=d.dimKills||state.dimKills;state.boss1Defeated=d.boss1Defeated??state.boss1Defeated;state.teamRevives=d.teamRevives??state.teamRevives;updateReviveUI();net.roomPlayers=new Map((d.players||[]).map(p=>[p.id,p]));renderLobby();setPortalState();refreshUI();
+      }else if(d.type==="start"){
+        hideAllOverlays();state.inGame=true;state.started=true;state.dead=false;state.spectating=false;
+        localAvatar.root.setEnabled(true);
+        $("spectateBtn").style.display="inline-block";
+        state.teamRevives=d.teamRevives??5;state.paused=false;state.pauseReason="";placeLocalForDim(-1);
+        ui.roomHud.textContent=`방 ${state.roomCode}`;setNetStatus("멀티 연결됨","online");updateReviveUI();
+      }else if(d.type==="remoteState"){
+        net.remoteStates.set(d.id,d.state);renderRemotePlayers();
+      }else if(d.type==="enemySnapshot")applyEnemySnapshot(d.enemies||[]);
+      else if(d.type==="damage")takeLocalDamage(d.amount||0,null);
+      else if(d.type==="natureMission"){state.boss2Defeated=true;startNatureMission()}
+      else if(d.type==="portalNatureState"){
+        state.portalNatureDone=new Set(Array.isArray(d.ids)?d.ids:[]);
+        updatePortalNatureMissionText();
+        if(state.portalNatureDone.size>=PORTAL_NATURE_TOTAL)finishNatureEnding();
+      }
+      else if(d.type==="natureEnding"){
+        state.portalNatureDone=new Set(["hub-0","hub-1","hub-2","hub-3","return-0","return-1","return-2","return-3"]);
+        finishNatureEnding();
+      }
+      else if(d.type==="win"){$("winScreen").style.display="flex";state.gameOver=true}
+    }
+  }
+  function broadcast(data){net.connections.forEach(c=>{if(c.open)c.send(data)})}
+  function broadcastExcept(id,data){net.connections.forEach((c,k)=>{if(k!==id&&c.open)c.send(data)})}
+  function sendHost(data){if(net.hostConn?.open)net.hostConn.send(data)}
+  function sendTo(id,data){const c=net.connections.get(id);if(c?.open)c.send(data)}
+  function broadcastRoomState(){
+    if(!state.isHost)return;
+    const players=[{id:"host",name:state.nickname,host:true},...Array.from(net.roomPlayers.values())];
+    broadcast({type:"roomState",players,dimKills:state.dimKills,boss1Defeated:state.boss1Defeated,teamRevives:state.teamRevives});renderLobby();
+  }
+  function sendPlayerState(now,force=false){
+    if(!state.isMultiplayer||!state.inGame||(!force&&now-net.lastSend<.08))return;
+    net.lastSend=now;
+    const s={
+      x:localAvatar.root.position.x,y:localAvatar.root.position.y,z:localAvatar.root.position.z,
+      rot:localAvatar.root.rotation.y,hp:state.hp,dim:state.currentDim,name:state.nickname,
+      dead:state.dead,shopOpen:state.shopOpen
+    };
+    if(state.isHost)broadcast({type:"remoteState",id:"host",state:s});else sendHost({type:"playerState",state:s});
+  }
+  function enemySnapshot(){
+    return enemies.map(e=>({id:e.id,x:e.mesh.position.x,y:e.mesh.position.y,z:e.mesh.position.z,rot:e.mesh.rotation.y,hp:e.hp,maxHp:e.maxHp,name:e.name,isBoss:e.isBoss,bossLevel:e.bossLevel||0,dim:e.dim}));
+  }
+  function broadcastEnemies(now){
+    if(state.isMultiplayer&&state.isHost&&state.inGame&&now-net.lastEnemyBroadcast>.1){net.lastEnemyBroadcast=now;broadcast({type:"enemySnapshot",enemies:enemySnapshot()})}
+  }
+  function applyEnemySnapshot(list){
+    const ids=new Set(list.map(e=>e.id));
+    enemyMeshes.forEach((m,id)=>{if(!ids.has(id)){disposeEnemyHealthUI(m._healthUI);m.dispose();enemyMeshes.delete(id)}});
+    list.forEach(e=>{
+      let m=enemyMeshes.get(e.id);
+      if(!m){
+        m=makeZombieMesh("ghostEnemy"+e.id,!!e.isBoss);
+        m._healthUI=createEnemyHealthUI(m,!!e.isBoss);
+        enemyMeshes.set(e.id,m);
+      }
+      m.position.set(e.x,e.y,e.z);m.rotation.y=e.rot||0;
+      m.metadata={hp:e.hp,maxHp:e.maxHp,name:e.name,isBoss:e.isBoss,bossLevel:e.bossLevel||0,dim:e.dim};
+      updateEnemyHealthUI(m._healthUI,e.hp,e.maxHp,e.name);
+      m.setEnabled(e.dim===state.currentDim||state.spectating);
+    });
+  }
+
+  const remoteAvatars=new Map();
+  function renderRemotePlayers(){
+    const ids=new Set();
+    net.remoteStates.forEach((s,id)=>{
+      if(id==="host"&&state.isHost)return;
+      ids.add(id);let a=remoteAvatars.get(id);
+      if(!a){a=makePlayerMesh("Remote"+id.slice(-5),"#ffb85b");remoteAvatars.set(id,a)}
+      const viewDim=(state.dead&&state.spectating&&getSpectateTargets().length)?getSpectateTargets()[Math.min(state.spectateIndex,getSpectateTargets().length-1)].dim:state.currentDim;
+      a.root.setEnabled(!s.dead&&s.dim===viewDim);
+      if(!s.dead&&s.dim===viewDim){a.root.position=BABYLON.Vector3.Lerp(a.root.position,new BABYLON.Vector3(s.x,s.y,s.z),.45);a.root.rotation.y=s.rot||0}
+    });
+    remoteAvatars.forEach((a,id)=>{if(!ids.has(id)){a.root.getChildMeshes().forEach(m=>m.dispose());a.root.dispose();remoteAvatars.delete(id)}});
+  }
+
+  function createRoom(){
+    closeNetwork();state.nickname=($("nickname").value.trim()||"BladePlayer").slice(0,14);state.isMultiplayer=true;state.isHost=true;state.roomCode=makeRoomCode();
+    $("roomCodeDisplay").textContent=state.roomCode;$("lobbyStatus").textContent="친구가 방 코드로 참가할 수 있습니다.";
+    $("home").style.display="none";$("lobbyScreen").style.display="flex";$("startMultiBtn").style.display="inline-block";
+    setNetStatus("연결 준비 중","warn");ui.roomHud.textContent=`방 ${state.roomCode}`;
+    if(typeof Peer==="undefined"){state.isMultiplayer=false;alert("멀티 연결 모듈을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.");goHome();return}
+    net.peer=new Peer("blade-"+state.roomCode);
+    net.peer.on("open",()=>{markRoomOpen(state.roomCode,true);setNetStatus("방 열림","online");net.roomPlayers.set("host",{id:"host",name:state.nickname,host:true});renderLobby()});
+    net.peer.on("connection",conn=>{if(net.connections.size>=3){conn.on("open",()=>conn.send({type:"full"}));return}setupConn(conn,true)});
+    net.peer.on("error",err=>{setNetStatus("연결 오류","warn");$("lobbyStatus").textContent="방 연결에 실패했습니다. 다른 방 코드로 다시 시도해주세요."});
+    renderLobby();
+  }
+
+  function joinRoom(){
+    const code=$("roomCodeInput").value.trim().toUpperCase();
+    if(code.length!==6){
+      $("joinStatus").textContent="6자리 방 코드를 입력해주세요.";
+      return;
+    }
+
+    const wasTypingBeforeJoin=net.codeTypingStarted;
+    const hadCompletedCode=net.codeWasComplete;
+    closeNetwork();
+    state.nickname=($("nickname").value.trim()||"BladePlayer").slice(0,14);
+    state.isMultiplayer=true;state.isHost=false;state.roomCode=code;
+    net.joinedSuccessfully=false;
+    net.codeTypingStarted=wasTypingBeforeJoin;
+    net.codeWasComplete=hadCompletedCode;
+    $("joinStatus").textContent="방에 연결하는 중...";
+    setNetStatus("연결 중","warn");
+
+    if(typeof Peer==="undefined"){
+      showCatNetworkAnimation("room-missing",{code});
+      return;
+    }
+
+    setTimeout(()=>{
+      if(state.roomCode!==code||state.isHost)return;
+      net.intentionalClose=false;
+      net.peer=new Peer();
+
+      net.joinTimer=setTimeout(()=>{
+        if(!net.joinedSuccessfully&&!net.intentionalClose)showJoinFailureForCode(state.roomCode);
+      },7000);
+
+      net.peer.on("open",()=>{
+        const conn=net.peer.connect("blade-"+code,{reliable:true});
+        setupConn(conn,false);
+        conn.on("open",()=>{
+          net.joinedSuccessfully=true;
+          markRoomOpen(code,false);
+          net.codeTypingStarted=false;
+          net.codeWasComplete=true;
+          if(net.joinTimer){clearTimeout(net.joinTimer);net.joinTimer=null}
+          $("joinScreen").style.display="none";$("lobbyScreen").style.display="flex";
+          $("roomCodeDisplay").textContent=code;$("startMultiBtn").style.display="none";
+          $("lobbyStatus").textContent="방장이 게임을 시작하기를 기다리는 중...";
+          setNetStatus("멀티 연결됨","online");ui.roomHud.textContent=`방 ${code}`;
+        });
+      });
+
+      net.peer.on("error",()=>{
+        if(net.joinTimer){clearTimeout(net.joinTimer);net.joinTimer=null}
+        if(!net.joinedSuccessfully&&!net.intentionalClose){
+          setNetStatus("연결 실패","warn");
+          showJoinFailureForCode(state.roomCode);
+        }
+      });
+    },330);
+  }
+
+  function renderLobby(){
+    const list=$("playerList");list.innerHTML="";
+    let players=[];
+    if(state.isHost)players=[{id:"host",name:state.nickname,host:true},...Array.from(net.roomPlayers.values()).filter(p=>p.id!=="host")];
+    else players=Array.from(net.roomPlayers.values());
+    if(players.length===0)players=[{id:"me",name:state.nickname,host:false}];
+    players.slice(0,4).forEach(p=>{const d=document.createElement("div");d.className="playerCard";d.innerHTML=`<b>${escapeHtml(p.name||"플레이어")}</b><div class="status">${p.host?"👑 방장":"⚔ 파티원"}</div>`;list.appendChild(d)});
+  }
+
+  function startMultiplayer(){
+    $("gameOver").style.display="none";$("spectateBar").style.display="none";
+    if(!state.isHost)return;hideAllOverlays();state.inGame=true;state.started=true;state.dead=false;state.spectating=false;state.teamRevives=5;state.paused=false;localAvatar.root.setEnabled(true);$("spectateBtn").style.display="inline-block";state.pauseReason="";state.currentDim=-1;placeLocalForDim(-1);updateReviveUI();broadcast({type:"start",teamRevives:state.teamRevives});broadcastRoomState();ui.roomHud.textContent=`방 ${state.roomCode}`;setNetStatus("멀티 연결됨","online");
+  }
+
+  // ---------- UI ----------
+  function hideAllOverlays(){["home","joinScreen","lobbyScreen","gameOver","winScreen","tutorial","pauseMenu","settingsScreen","bugScreen","bugInboxScreen"].forEach(id=>$(id).style.display="none")}
+  function startSolo(tutorial=false){
+    $("catNetworkScreen").style.display="none";
+    $("gameOver").style.display="none";$("spectateBar").style.display="none";
+    closeNetwork();state.nickname=($("nickname").value.trim()||"BladePlayer").slice(0,14);hideAllOverlays();state.inGame=true;state.started=true;state.tutorialMode=tutorial;state.gameOver=false;state.dead=false;state.spectating=false;state.teamRevives=5;state.paused=false;localAvatar.root.setEnabled(true);$("spectateBtn").style.display="none";state.pauseReason="";state.dimKills=save.dimKills??state.dimKills;state.boss1Defeated=save.boss1Defeated??state.boss1Defeated;state.boss2Defeated=false;state.natureMode=false;ui.natureMission.style.display="none";clearNature();placeLocalForDim(-1);ui.roomHud.textContent=tutorial?"튜토리얼":"혼자 연습";setNetStatus("오프라인");
+    updateReviveUI();if(tutorial)showTutorial(0);
+  }
+
+  function openEndingCredits(){
+    $("winScreen").style.display="none";
+    $("creditsScreen").style.display="block";
+
+    // 크레딧 애니메이션을 처음부터 다시 시작
+    const roll=$("creditsRoll");
+    roll.style.animation="none";
+    void roll.offsetHeight;
+    roll.style.animation="creditsScroll 26s linear forwards";
+  }
+
+  function closeEndingCreditsToHome(){
+    $("creditsScreen").style.display="none";
+    goHome();
+  }
+
+  function goHome(){$("creditsScreen").style.display="none";state.inGame=false;state.gameOver=false;state.dead=false;state.spectating=false;state.shopOpen=false;state.natureMode=false;ui.natureMission.style.display="none";if(natureAuraRing)natureAuraRing.setEnabled(false);clearNature();localAvatar.root.setEnabled(true);$("spectateBar").style.display="none";state.paused=false;state.pauseReason="";ui.pauseState.style.display="none";ui.aimDot.style.display="none";clearEnemies();closeNetwork();hideAllOverlays();$("home").style.display="flex";ui.shop.style.display="none"}
+  const tutorialSteps=[
+    {t:"카메라 조작",x:"마우스 오른쪽 버튼을 누른 채 드래그하면 화면이 회전합니다. 이전 버전의 화면 회전 버그를 이 방식으로 수정했습니다.",k:["우클릭 + 드래그: 회전","마우스 휠: 확대/축소"]},
+    {t:"이동",x:"로블록스처럼 카메라가 보고 있는 방향을 기준으로 움직입니다.",k:["W: 앞으로","A/D: 좌우","S: 뒤로","Shift: 달리기"]},
+    {t:"점프",x:"Space를 누르면 점프합니다.",k:["Space: 점프"]},
+    {t:"기본 공격",x:"적이 앞에 있을 때 좌클릭으로 검을 휘두릅니다.",k:["좌클릭: 기본 베기"]},
+    {t:"방어와 회피",x:"F를 누르면 용사가 검을 몸 앞에 세워 방어합니다. 피해를 받지 않고 5초가 지나면 HP가 자동으로 회복됩니다.",k:["F: 방어 모션","E: 회피","5초 후 HP 자동 회복"]},
+    {t:"전투 스킬",x:"Q를 누르면 용사가 실제로 한 바퀴 회전하면서 주변 적을 베고, R은 앞으로 돌진하며 공격합니다.",k:["Q: 실제 회전 베기","R: 돌진 베기"]},
+    {t:"무기·갑옷 상점",x:"B를 누르면 상점이 열립니다. 검뿐 아니라 피해를 줄여주는 갑옷도 구매하고 장착할 수 있습니다.",k:["B: 상점","60초 제한","상점 이용 중 공격 대상 제외"]},
+    {t:"차원 포털",x:"중앙 로비의 빛나는 문 안으로 걸어 들어가면 차원이 열립니다. 일정 수의 적을 처치해야 다음 차원이 해금됩니다.",k:["초원 → 사막 → 성채 → 심연","보스1 처치 후 맨 뒤 포털 개방","멀티에서도 포털 이동은 각자 개인"]},
+    {t:"튜토리얼 완료",x:"이제 준비가 끝났습니다. 초원의 차원 포털로 들어가 첫 전투를 시작해보세요.",k:["보스2 처치 후 자연 미션 시작","각 포털 주변에 자연 1개 이상 만들기","포털 자연화 8/8 달성 시 엔딩","자연 미션 중 몬스터 생성 없음"]}
+  ];
+  let tutorialIndex=0;
+  function showTutorial(i){tutorialIndex=i;const s=tutorialSteps[i];$("tutorial").style.display="flex";$("tutorialStep").textContent=`${i+1} / ${tutorialSteps.length}`;$("tutorialTitle").textContent=s.t;$("tutorialText").textContent=s.x;$("tutorialKeys").innerHTML=s.k.map(v=>`<div class="key">${escapeHtml(v)}</div>`).join("");$("nextTutorial").textContent=i===tutorialSteps.length-1?"시작":"다음"}
+  function nextTutorial(){if(tutorialIndex>=tutorialSteps.length-1){$("tutorial").style.display="none";showMessage("튜토리얼 완료! 초원 포털로 이동하세요.",1500)}else showTutorial(tutorialIndex+1)}
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]))}
+
+  function renderShop(){
+    ui.weaponList.innerHTML="";
+    WEAPONS.forEach((w,i)=>{
+      const owned=state.owned.includes(i),eq=state.equipped===i,lv=state.upgrades[i]||0;
+      const card=document.createElement("div");card.className="weapon "+(eq?"eq":"");card.innerHTML=`<h3 class="${w.cls}">${w.name} ${lv?`+${lv}`:""}</h3><div class="meta">희귀도: ${w.rarity}<br>공격력: ${Math.round(w.damage*(1+lv*.12))}<br>공격 속도: ${w.speed.toFixed(2)}초<br>사거리: ${w.range.toFixed(1)}</div>`;
+      const b=document.createElement("button");
+      if(eq){b.textContent="장착 중";b.disabled=true}
+      else if(owned){b.textContent="장착";b.addEventListener("click",()=>{state.equipped=i;saveProgress();updateSword();renderShop()})}
+      else{b.textContent=`구매 ${w.price}G`;b.disabled=state.gold<w.price;b.addEventListener("click",()=>{if(state.gold>=w.price){state.gold-=w.price;state.owned.push(i);state.equipped=i;saveProgress();updateSword();renderShop();refreshUI()}})}
+      card.appendChild(b);ui.weaponList.appendChild(card);
+    });
+    const lv=state.upgrades[state.equipped]||0,cost=120+state.equipped*140+lv*180;ui.upgradeInfo.textContent=`비용 ${cost}G · 강화당 공격력 +12%`;ui.upgradeBtn.disabled=state.gold<cost||lv>=10;ui.upgradeBtn.textContent=lv>=10?"최대 강화":"장착 무기 강화";
+
+    ui.armorList.innerHTML="";
+    ARMORS.forEach((a,i)=>{
+      const owned=state.armorOwned.includes(i),eq=state.equippedArmor===i;
+      const card=document.createElement("div");
+      card.className="weapon "+(eq?"eq":"");
+      card.innerHTML=`<h3 class="${a.cls}">${a.name}</h3><div class="meta">희귀도: ${a.rarity}<br>피해 감소: ${Math.round(a.defense*100)}%<br>${i===4?"용사를 위한 최고 등급 갑옷":"방어력을 높여 생존력을 강화"}</div>`;
+      const b=document.createElement("button");
+      if(eq){b.textContent="장착 중";b.disabled=true}
+      else if(owned){
+        b.textContent="장착";
+        b.addEventListener("click",()=>{
+          state.equippedArmor=i;saveProgress();updateArmorVisual();renderShop();refreshUI();
+        });
+      }else{
+        b.textContent=`구매 ${a.price}G`;b.disabled=state.gold<a.price;
+        b.addEventListener("click",()=>{
+          if(state.gold<a.price)return;
+          state.gold-=a.price;state.armorOwned.push(i);state.equippedArmor=i;
+          saveProgress();updateArmorVisual();renderShop();refreshUI();showMessage(`${a.name} 구매!`,800);
+        });
+      }
+      card.appendChild(b);ui.armorList.appendChild(card);
+    });
+    const currentArmor=armorStats();
+    ui.armorInfo.textContent=`현재 장착: ${currentArmor.name} · 피해 ${Math.round(currentArmor.defense*100)}% 감소`;
+  }
+  function toggleShop(force){
+    const open=force!==undefined?force:ui.shop.style.display!=="block";
+    ui.shop.style.display=open?"block":"none";
+    if(open){
+      if(state.dead)return;
+      state.shopOpen=true;
+      state.shopEndsAt=performance.now()/1000+60;
+      state.blocking=false;
+      $("pauseMenu").style.display="none";
+      renderShop();updateShopTimer();
+      if(state.isMultiplayer)sendPlayerState(performance.now()/1000,true);
+    }else{
+      state.shopOpen=false;state.shopEndsAt=0;
+      if(state.isMultiplayer)sendPlayerState(performance.now()/1000,true);
+    }
+  }
+
+  function updateShopTimer(){
+    if(!state.shopOpen)return;
+    const left=Math.max(0,state.shopEndsAt-performance.now()/1000);
+    ui.shopTimer.textContent=`남은 시간 ${Math.ceil(left)}초`;
+    if(left<=0){
+      toggleShop(false);
+      showMessage("상점 이용 시간이 끝났습니다.",900);
+    }
+  }
+
+  function upgradeWeapon(){const i=state.equipped,lv=state.upgrades[i]||0,cost=120+i*140+lv*180;if(lv>=10||state.gold<cost)return;state.gold-=cost;state.upgrades[i]=lv+1;saveProgress();renderShop();updateSword();refreshUI();showMessage("강화 성공!",700)}
+
+
+
+
+  function resetAllGameData(){
+    const firstConfirm=confirm(
+      "정말 게임 데이터를 초기화할까요?\n\n" +      "골드, 무기, 갑옷, 강화, 차원 진행도, 설정, 버그 제보가 모두 삭제됩니다."
+    );
+    if(!firstConfirm)return;
+
+    const secondConfirm=confirm(
+      "마지막 확인입니다.\n초기화한 데이터는 복구할 수 없습니다.\n계속하시겠습니까?"
+    );
+    if(!secondConfirm)return;
+
+    const keysToRemove=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k && (
+        k.toLowerCase().includes("blade") ||
+        k.toLowerCase().includes("dimension")
+      )){
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k=>localStorage.removeItem(k));
+
+    alert("초기화가 완료되었습니다. 게임을 처음 상태로 다시 시작합니다.");
+    location.reload();
+  }
+
+  function getBugReports(){
+    try{
+      const r=JSON.parse(localStorage.getItem("bladeBugReports")||"[]");
+      return Array.isArray(r)?r:[];
+    }catch(_){return []}
+  }
+  function bugCategoryName(v){
+    return ({camera:"카메라/화면",combat:"전투",multiplayer:"멀티플레이",shop:"상점/아이템",other:"기타"})[v]||v||"기타";
+  }
+  function updateBugInboxCount(){
+    const el=$("bugInboxCount");
+    if(el)el.textContent=String(getBugReports().length);
+  }
+  function renderBugInbox(){
+    const list=$("bugInboxList"), empty=$("bugInboxEmpty");
+    if(!list||!empty)return;
+    const reports=getBugReports().slice().reverse();
+    list.innerHTML="";
+    empty.style.display=reports.length?"none":"block";
+    reports.forEach(r=>{
+      const item=document.createElement("div");
+      item.className="bugInboxItem";
+      const when=(()=>{try{return new Date(r.time).toLocaleString("ko-KR")}catch(_){return r.time||"-"}})();
+      item.innerHTML=`
+        <div class="topline">
+          <b>${escapeHtml(r.id||"-")}</b>
+          <span class="status">${escapeHtml(bugCategoryName(r.category))}</span>
+        </div>
+        <div class="bugdesc">${escapeHtml(r.description||"")}</div>
+        <div class="bugmeta">${escapeHtml(when)} · ${r.multiplayer?"멀티":"싱글"}${r.room?` · 방 ${escapeHtml(r.room)}`:""}${Number.isInteger(r.dimension)?` · 차원 ${r.dimension}`:""}${r.nickname?` · ${escapeHtml(r.nickname)}`:""}</div>
+      `;
+      list.appendChild(item);
+    });
+    updateBugInboxCount();
+  }
+  function openBugInbox(){
+    $("settingsScreen").style.display="none";
+    $("bugInboxScreen").style.display="flex";
+    setPaused(true,"bugInbox",true);
+    renderBugInbox();
+  }
+  function closeBugInbox(){
+    $("bugInboxScreen").style.display="none";
+    $("settingsScreen").style.display="flex";
+    setPaused(true,"settings",true);
+  }
+
+  const I18N={
+    ko:{
+      pauseBtn:"⏸ 정지",pauseTitle:"⏸ 게임 정지",pauseDesc:"전투가 정지되었습니다.",
+      resume:"계속하기",save:"저장하기",settings:"설정 열기",exit:"저장 후 나가기",
+      settingsTitle:"⚙ 설정",settingsDesc:"게임 환경을 변경할 수 있습니다.",
+      language:"언어",languageHelp:"게임 표시 언어",sound:"소리",soundHelp:"게임 전체 소리",
+      sfx:"효과음",sfxHelp:"공격, 피격, 점프 등의 효과음",bug:"버그 제보",bugHelp:"발견한 문제를 개발용 제보함에 저장합니다.",
+      report:"제보하기",settingsBack:"정지 메뉴로",bugTitle:"🐞 버그 제보",bugDesc:"무슨 문제가 있었는지 적어주세요. 현재 버전에서는 제보가 이 브라우저의 개발용 제보함에 저장됩니다.",
+      bugType:"종류",bugText:"문제 설명",submitBug:"제보 저장",bugBack:"설정으로",on:"켜기",
+      saved:"저장되었습니다.",shopTitle:"⚔ 무기 상점",shopText:"상점 이용자는 공격 대상에서 제외됩니다. 다른 팀원의 전투는 계속됩니다."
+    },
+    en:{
+      pauseBtn:"⏸ Pause",pauseTitle:"⏸ Game Paused",pauseDesc:"Combat is paused.",
+      resume:"Resume",save:"Save",settings:"Open Settings",exit:"Save & Exit",
+      settingsTitle:"⚙ Settings",settingsDesc:"Change your game preferences.",
+      language:"Language",languageHelp:"Display language",sound:"Sound",soundHelp:"Master game sound",
+      sfx:"Sound Effects",sfxHelp:"Attack, hit, jump and other effects",bug:"Bug Report",bugHelp:"Save a bug report to the local developer report box.",
+      report:"Report",settingsBack:"Back to Pause Menu",bugTitle:"🐞 Bug Report",bugDesc:"Describe what happened. In this prototype, reports are stored in this browser.",
+      bugType:"Category",bugText:"Description",submitBug:"Save Report",bugBack:"Back to Settings",on:"On",
+      saved:"Game saved.",shopTitle:"⚔ Weapon Shop",shopText:"The shopper cannot be targeted. Combat continues for teammates."
+    }
+  };
+  function applyLanguage(){
+    const t=I18N[state.settings.language]||I18N.ko;
+    document.documentElement.lang=state.settings.language==="en"?"en":"ko";
+    ui.pauseBtn.textContent=t.pauseBtn;$("pauseTitle").textContent=t.pauseTitle;$("pauseDesc").textContent=t.pauseDesc;
+    $("resumeBtn").textContent=t.resume;$("saveBtn").textContent=t.save;$("openSettingsBtn").textContent=t.settings;$("exitToHomeBtn").textContent=t.exit;
+    $("settingsTitle").textContent=t.settingsTitle;$("settingsDesc").textContent=t.settingsDesc;$("languageLabel").textContent=t.language;$("languageHelp").textContent=t.languageHelp;
+    $("soundLabel").textContent=t.sound;$("soundHelp").textContent=t.soundHelp;$("sfxLabel").textContent=t.sfx;$("sfxHelp").textContent=t.sfxHelp;
+    $("bugLabel").textContent=t.bug;$("bugHelp").textContent=t.bugHelp;$("openBugBtn").textContent=t.report;$("settingsBackBtn").textContent=t.settingsBack;
+    $("bugTitle").textContent=t.bugTitle;$("bugDesc").textContent=t.bugDesc;$("bugCategoryLabel").textContent=t.bugType;$("bugTextLabel").textContent=t.bugText;
+    $("submitBugBtn").textContent=t.submitBug;$("bugBackBtn").textContent=t.bugBack;$("soundOnText").textContent=t.on;$("sfxOnText").textContent=t.on;
+    $("shopTitle").textContent=t.shopTitle;$("shopPauseText").textContent=t.shopText;
+    ui.pauseState.textContent=state.settings.language==="en"?"⏸ BATTLE PAUSED":"⏸ 전투 정지 중";
+  }
+  function openSettings(){
+    $("pauseMenu").style.display="none";$("settingsScreen").style.display="flex";
+    $("languageSelect").value=state.settings.language;
+    $("soundToggle").checked=state.settings.sound;
+    $("sfxToggle").checked=state.settings.sfx;
+    $("maxFpsSelect").value=String(state.settings.maxFps??0);
+    setPaused(true,"settings",true);
+  }
+  function closeSettings(){
+    $("settingsScreen").style.display="none";$("pauseMenu").style.display="flex";setPaused(true,"menu",true);
+  }
+  function submitBug(){
+    const desc=$("bugText").value.trim();
+    if(!desc){
+      $("bugResult").textContent=state.settings.language==="en"?"Please describe the bug first.":"버그 내용을 먼저 적어주세요.";
+      return;
+    }
+    const id="BUG-"+Date.now().toString(36).toUpperCase();
+    const reports=JSON.parse(localStorage.getItem("bladeBugReports")||"[]");
+    const report={
+      id,
+      time:new Date().toISOString(),
+      category:$("bugCategory").value,
+      description:desc,
+      room:state.roomCode||null,
+      multiplayer:state.isMultiplayer,
+      dimension:state.currentDim,
+      language:state.settings.language,
+      nickname:state.nickname||"BladePlayer",
+      status:"new"
+    };
+    reports.push(report);
+    localStorage.setItem("bladeBugReports",JSON.stringify(reports.slice(-100)));
+    try{
+      const bc=new BroadcastChannel("bladeBugReportsChannel");
+      bc.postMessage({type:"new-report",report});
+      bc.close();
+    }catch(_){}
+    window.dispatchEvent(new CustomEvent("blade-bug-report",{detail:report}));
+    $("bugResult").textContent=(state.settings.language==="en"?"Saved report: ":"제보가 저장되었습니다. 관리자 제보함에 바로 표시됩니다: ")+id;
+    $("bugText").value="";
+    updateBugInboxCount();
+    renderBugInbox();
+  }
+
+
+
+  const natureCovered=new Set();
+  const natureInstances=[];
+  let natureAuraRing=null;
+  let natureSources=null;
+
+  function natureHash(x,z){
+    let h=(x*374761393 + z*668265263 + state.currentDim*1442695041)|0;
+    h=(h^(h>>>13))*1274126177;
+    return (h^(h>>>16))>>>0;
+  }
+
+  function createNatureSources(){
+    if(natureSources)return;
+
+    const grass=BABYLON.MeshBuilder.CreateCylinder("natureGrassSource",{
+      diameter:1.72,height:.045,tessellation:10
+    },scene);
+    grass.position.y=-1000;
+    grass.material=makeMat("natureGrassShared","#55a957");
+    grass.isPickable=false;
+
+    const flower=BABYLON.MeshBuilder.CreateSphere("natureFlowerSource",{
+      diameter:.18,segments:6
+    },scene);
+    flower.position.y=-1000;
+    flower.material=makeMat("natureFlowerShared","#ffd45e",.08);
+    flower.isPickable=false;
+
+    const trunk=BABYLON.MeshBuilder.CreateCylinder("natureTrunkSource",{
+      height:1.0,diameter:.16,tessellation:6
+    },scene);
+    trunk.position.y=-1000;
+    trunk.material=makeMat("natureTrunkShared","#765236");
+    trunk.isPickable=false;
+
+    const crown=BABYLON.MeshBuilder.CreateSphere("natureCrownSource",{
+      diameter:1.05,segments:7
+    },scene);
+    crown.position.y=-1000;
+    crown.material=makeMat("natureCrownShared","#4f9f59");
+    crown.isPickable=false;
+
+    natureSources={grass,flower,trunk,crown};
+  }
+
+  function createNatureAura(){
+    if(natureAuraRing)return;
+    natureAuraRing=BABYLON.MeshBuilder.CreateTorus("natureAuraRing",{
+      diameter:state.natureRadius*2,
+      thickness:.11,
+      tessellation:48
+    },scene);
+    natureAuraRing.position.y=.08;
+    natureAuraRing.material=makeMat("natureAuraM","#72ef83",.75,.8);
+    natureAuraRing.isPickable=false;
+    natureAuraRing.setEnabled(false);
+  }
+
+  function updateNatureAura(){
+    createNatureAura();
+    if(!state.natureMode||!state.inGame||state.dead){
+      natureAuraRing.setEnabled(false);
+      return;
+    }
+    natureAuraRing.setEnabled(true);
+    natureAuraRing.position.x=localAvatar.root.position.x;
+    natureAuraRing.position.z=localAvatar.root.position.z;
+  }
+
+  function natureCell(x,z){
+    const g=state.natureGrid;
+    const gx=Math.round(x/g);
+    const gz=Math.round(z/g);
+    return {gx,gz,x:gx*g,z:gz*g,key:`${state.currentDim}:${gx}:${gz}`};
+  }
+
+  function makeNaturePatch(x,z){
+    createNatureSources();
+
+    const c=natureCell(x,z);
+    if(natureCovered.has(c.key))return false;
+    natureCovered.add(c.key);
+
+    const h=natureHash(c.gx,c.gz);
+    const jx=(((h&255)/255)-.5)*.45;
+    const jz=((((h>>>8)&255)/255)-.5)*.45;
+    const px=c.x+jx, pz=c.z+jz;
+
+    const grass=natureSources.grass.createInstance("g"+state.naturePlaced);
+    grass.position.set(px,.025,pz);
+    const scale=.88+(((h>>>16)&255)/255)*.32;
+    grass.scaling.set(scale,1,scale);
+    grass.isPickable=false;
+    grass.freezeWorldMatrix();
+    natureInstances.push(grass);
+
+    // 꽃은 일부 칸에만 생성
+    if((h%100)<30){
+      const flower=natureSources.flower.createInstance("f"+state.naturePlaced);
+      flower.position.set(px+(((h>>>5)&15)/15-.5)*.8,.38,pz+(((h>>>12)&15)/15-.5)*.8);
+      const fs=.8+(((h>>>20)&15)/15)*.5;
+      flower.scaling.setAll(fs);
+      flower.isPickable=false;
+      flower.freezeWorldMatrix();
+      natureInstances.push(flower);
+    }
+
+    // 작은 나무는 드물게만 생성
+    if((h%1000)<55){
+      const tx=px+(((h>>>3)&7)/7-.5)*.55;
+      const tz=pz+(((h>>>10)&7)/7-.5)*.55;
+
+      const trunk=natureSources.trunk.createInstance("t"+state.naturePlaced);
+      trunk.position.set(tx,.5,tz);
+      trunk.isPickable=false;
+      trunk.freezeWorldMatrix();
+
+      const crown=natureSources.crown.createInstance("c"+state.naturePlaced);
+      crown.position.set(tx,1.25,tz);
+      const cs=.85+(((h>>>18)&15)/15)*.35;
+      crown.scaling.setAll(cs);
+      crown.isPickable=false;
+      crown.freezeWorldMatrix();
+
+      natureInstances.push(trunk,crown);
+    }
+
+    state.naturePlaced++;
+    checkPortalNatureAt(px,pz);
+    return true;
+  }
+
+  function burstNatureAroundPlayer(){
+    if(!state.natureMode||state.dead||state.shopOpen||state.paused||!state.inGame)return;
+
+    const cx=localAvatar.root.position.x;
+    const cz=localAvatar.root.position.z;
+    const g=state.natureGrid;
+    const r=state.natureRadius;
+    const minX=Math.floor((cx-r)/g);
+    const maxX=Math.ceil((cx+r)/g);
+    const minZ=Math.floor((cz-r)/g);
+    const maxZ=Math.ceil((cz+r)/g);
+
+    let added=0;
+
+    // 원 내부의 격자를 한 번에 채우되 이미 했던 곳은 건너뜀
+    for(let gx=minX;gx<=maxX;gx++){
+      for(let gz=minZ;gz<=maxZ;gz++){
+        const x=gx*g,z=gz*g;
+        const dx=x-cx,dz=z-cz;
+        if(dx*dx+dz*dz<=r*r){
+          if(makeNaturePatch(x,z))added++;
+        }
+      }
+    }
+
+    state.natureLastBurstX=cx;
+    state.natureLastBurstZ=cz;
+    updatePortalNatureMissionText();
+  }
+
+  function clearNature(){
+    while(natureInstances.length){
+      const n=natureInstances.pop();
+      try{n.dispose()}catch(_){}
+    }
+    natureCovered.clear();
+    state.portalNatureDone.clear();
+    state.endingShown=false;
+    state.naturePlaced=0;
+    state.lastNatureX=null;
+    state.lastNatureZ=null;
+    state.natureSpawnAcc=0;
+    state.natureLastBurstX=null;
+    state.natureLastBurstZ=null;
+    if(natureAuraRing)natureAuraRing.setEnabled(false);
+  }
+
+  function startNatureMission(){
+    state.natureMode=true;
+    clearEnemies();
+    state.lastNatureX=null;
+    state.lastNatureZ=null;
+    ui.natureMission.style.display="block";
+    createNatureAura();
+    createNatureSources();
+    natureAuraRing.setEnabled(true);
+    state.portalNatureDone.clear();
+    state.endingShown=false;
+    ui.natureMissionSub.textContent=
+      `포털 자연화 0/${PORTAL_NATURE_TOTAL} · 각 포털 주변에 자연을 1개 이상 피우세요`;
+    burstNatureAroundPlayer();
+    updatePortalNatureMissionText();
+    showMessage("🌿 새로운 미션: 모든 맵을 자연으로 뒤덮으세요",2400);
+  }
+
+  function updateNatureTrail(dt=.016){
+    createNatureAura();
+
+    if(!state.natureMode||state.dead||state.shopOpen||state.paused||!state.inGame){
+      natureAuraRing.setEnabled(false);
+      return;
+    }
+
+    const now=performance.now()/1000;
+
+    // 포털 이동 중에는 자연 범위 비활성화
+    if(now<state.teleportLock){
+      natureAuraRing.setEnabled(false);
+      return;
+    }
+
+    natureAuraRing.setEnabled(true);
+    natureAuraRing.position.x=localAvatar.root.position.x;
+    natureAuraRing.position.z=localAvatar.root.position.z;
+
+    const x=localAvatar.root.position.x;
+    const z=localAvatar.root.position.z;
+
+    if(state.natureLastBurstX===null){
+      burstNatureAroundPlayer();
+      return;
+    }
+
+    // 격자 2칸 정도 이동했을 때 새 영역만 한 번에 자연화
+    const dist=Math.hypot(x-state.natureLastBurstX,z-state.natureLastBurstZ);
+    if(dist>=state.natureGrid*2){
+      burstNatureAroundPlayer();
+    }
+  }
+
+  function getBoss2View(){
+    if(state.currentDim!==3)return null;
+    if(!state.isMultiplayer||state.isHost){
+      const e=enemies.find(x=>x.bossLevel===2&&x.dim===3);
+      return e?{hp:e.hp,maxHp:e.maxHp,name:e.name}:null;
+    }
+    let found=null;
+    enemyMeshes.forEach(m=>{
+      if(m.metadata?.bossLevel===2&&m.metadata?.dim===3){
+        found={hp:m.metadata.hp,maxHp:m.metadata.maxHp,name:m.metadata.name};
+      }
+    });
+    return found;
+  }
+
+  function updateBoss2Hud(){
+    const b=getBoss2View();
+    if(!b){
+      ui.boss2Hud.style.display="none";
+      return;
+    }
+    ui.boss2Hud.style.display="block";
+    ui.boss2HpText.textContent=`${Math.max(0,Math.ceil(b.hp))} / ${b.maxHp}`;
+    ui.boss2HpFill.style.width=`${Math.max(0,b.hp)/b.maxHp*100}%`;
+  }
+
+  function refreshUI(){
+    ui.gold.textContent=state.gold;ui.kills.textContent=state.kills;updateReviveUI();ui.dimension.textContent=state.currentDim<0?"차원 로비":DIMS[state.currentDim].name;
+    ui.hpText.textContent=`${Math.ceil(state.hp)} / ${state.maxHp}`;ui.hpFill.style.width=`${state.hp/state.maxHp*100}%`;
+    if(ui.regenText){
+      const left=Math.max(0,state.regenDelay-(performance.now()/1000-state.lastDamageAt));
+      ui.regenText.textContent=state.hp>=state.maxHp?`HP 최대 · ${armorStats().name}`:(left>0?`자동 회복까지 ${left.toFixed(1)}초 · ${armorStats().name}`:`HP 자동 회복 중 · ${armorStats().name}`);
+    }
+    ui.dimHelp.innerHTML=`<b>차원 개방</b><br>초원: 기본 개방<br>사막: ${unlocked(1)?"✅":`${state.dimKills[0]}/8`}<br>성채: ${unlocked(2)?"✅":`${state.dimKills[1]}/10`}<br>심연: ${unlocked(3)?"✅":"🔒 보스1 필요"}`;
+    const t=state.currentTarget;
+    if(t){ui.targetBox.style.display="block";ui.targetName.textContent=(t.isBoss?"👑 ":"")+t.name;ui.targetHp.textContent=`${Math.max(0,Math.ceil(t.hp))} / ${t.maxHp}`;ui.targetFill.style.width=`${Math.max(0,t.hp)/t.maxHp*100}%`;ui.targetFill.className="fill "+(t.isBoss?"bossFill":"enemyFill")}
+    else ui.targetBox.style.display="none";
+    setPortalState();updateBoss2Hud();
+  }
+
+  function facingName(yaw){
+    const a=((yaw%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+    const deg=a*180/Math.PI;
+    if(deg>=337.5||deg<22.5)return "남쪽 (+Z)";
+    if(deg<67.5)return "남서";
+    if(deg<112.5)return "서쪽 (-X)";
+    if(deg<157.5)return "북서";
+    if(deg<202.5)return "북쪽 (-Z)";
+    if(deg<247.5)return "북동";
+    if(deg<292.5)return "동쪽 (+X)";
+    return "남동";
+  }
+
+  function currentLocationName(){
+    if(state.currentDim<0)return "차원 로비";
+    return DIMS[state.currentDim]?.name||`차원 ${state.currentDim}`;
+  }
+
+  function visibleEnemyCount(){
+    if(!state.isMultiplayer||state.isHost){
+      return enemies.filter(e=>e.dim===state.currentDim).length;
+    }
+    let count=0;
+    enemyMeshes.forEach(m=>{
+      if(m.metadata?.dim===state.currentDim)count++;
+    });
+    return count;
+  }
+
+  function updateDebugPanel(force=false){
+    if(!state.debugOpen){
+      ui.debugPanel.style.display="none";
+      return;
+    }
+
+    ui.debugPanel.style.display="block";
+
+    const now=performance.now()/1000;
+    if(!force&&now-state.debugLastUpdate<.25)return;
+    state.debugLastUpdate=now;
+
+    const fps=Math.round(engine.getFps());
+    const common=[
+      `FPS: ${fps}`,
+      `FPS 제한: ${state.settings.maxFps>0?state.settings.maxFps:"없음"}`
+    ];
+
+    // 홈에서는 캐릭터가 아니라 마우스 좌표 표시
+    if(!state.inGame){
+      const vw=Math.max(1,window.innerWidth);
+      const vh=Math.max(1,window.innerHeight);
+      const mx=Math.round(state.mouseScreenX);
+      const my=Math.round(state.mouseScreenY);
+
+      ui.debugText.textContent=[
+        ...common,
+        `좌표 모드: 마우스`,
+        `Mouse X: ${mx}px`,
+        `Mouse Y: ${my}px`,
+        `화면 비율 좌표: ${(mx/vw*100).toFixed(1)}% / ${(my/vh*100).toFixed(1)}%`,
+        `화면 크기: ${vw} × ${vh}`,
+        `상태: 홈 화면`
+      ].join("\n");
+      return;
+    }
+
+    // 플레이가 시작되면 캐릭터 XYZ로 자동 전환
+    const p=localAvatar.root.position;
+    const yaw=((localAvatar.root.rotation.y*180/Math.PI)%360+360)%360;
+    const pitch=Math.round(state.pitch*180/Math.PI);
+    const mode=state.isMultiplayer?(state.isHost?"멀티 / 방장":"멀티 / 참가자"):"싱글";
+    const room=state.isMultiplayer?(state.roomCode||"-"):"-";
+    const armor=armorStats();
+    const weapon=weaponStats();
+    const boss2=getBoss2View();
+
+    const lines=[
+      ...common,
+      `좌표 모드: 캐릭터`,
+      `XYZ: ${p.x.toFixed(2)} / ${p.y.toFixed(2)} / ${p.z.toFixed(2)}`,
+      `X: ${p.x.toFixed(2)}`,
+      `Y: ${p.y.toFixed(2)}`,
+      `Z: ${p.z.toFixed(2)}`,
+      `위치: ${currentLocationName()}`,
+      `방향: ${facingName(localAvatar.root.rotation.y)} (${yaw.toFixed(1)}°)`,
+      `카메라 Pitch: ${pitch}°`,
+      `HP: ${Math.ceil(state.hp)} / ${state.maxHp}`,
+      `무기: ${weapon.name} / 공격력 ${Math.round(weapon.damage)}`,
+      `갑옷: ${armor.name} / 피해감소 ${Math.round(armor.defense*100)}%`,
+      `골드: ${state.gold}`,
+      `처치 수: ${state.kills}`,
+      `현재 차원 몬스터: ${visibleEnemyCount()}`,
+      `팀 부활권: ${state.teamRevives}`,
+      `게임 모드: ${mode}`,
+      `방 코드: ${room}`,
+      `상점: ${state.shopOpen?"열림":"닫힘"}`,
+      `자연 미션: ${state.natureMode?"활성":"비활성"}`,
+      `자연 생성 지점: ${state.naturePlaced}`,
+      `포털 자연화: ${state.portalNatureDone.size} / ${PORTAL_NATURE_TOTAL}`,
+      `보스2 HP: ${boss2?`${Math.ceil(boss2.hp)} / ${boss2.maxHp}`:"없음"}`
+    ];
+
+    ui.debugText.textContent=lines.join("\n");
+  }
+
+  function cooldowns(){const now=performance.now()/1000,s=Math.max(0,state.spinReady-now),d=Math.max(0,state.dashReady-now);ui.spinCd.textContent=s?`${s.toFixed(1)}초`:"사용 가능";ui.dashCd.textContent=d?`${d.toFixed(1)}초`:"사용 가능"}
+  function showMessage(text,ms=1000){ui.msg.textContent=text;ui.msg.style.opacity=1;clearTimeout(showMessage.t);showMessage.t=setTimeout(()=>ui.msg.style.opacity=0,ms)}
+
+  let audio=null;function tone(freq,dur,vol){if(!state.settings.sound||!state.settings.sfx)return;try{audio=audio||new (window.AudioContext||window.webkitAudioContext)();const o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(audio.destination);o.start();o.stop(audio.currentTime+dur)}catch(_){}}
+
+  $("openBugInboxBtn").addEventListener("click",openBugInbox);
+  $("resetGameBtn").addEventListener("click",resetAllGameData);
+  $("bugInboxBackBtn").addEventListener("click",closeBugInbox);
+  $("bugInboxRefreshBtn").addEventListener("click",renderBugInbox);
+  $("bugInboxClearBtn").addEventListener("click",()=>{
+    if(confirm("모든 버그 제보를 삭제할까요?")){
+      localStorage.removeItem("bladeBugReports");
+      renderBugInbox();
+    }
+  });
+  window.addEventListener("storage",e=>{
+    if(e.key==="bladeBugReports"){updateBugInboxCount();renderBugInbox();}
+  });
+  window.addEventListener("blade-bug-report",()=>{updateBugInboxCount();renderBugInbox();});
+  try{
+    const bugChannel=new BroadcastChannel("bladeBugReportsChannel");
+    bugChannel.addEventListener("message",()=>{updateBugInboxCount();renderBugInbox();});
+  }catch(_){}
+
+  ui.pauseBtn.addEventListener("click",()=>togglePauseMenu());
+  $("resumeBtn").addEventListener("click",()=>togglePauseMenu(false));
+  $("saveBtn").addEventListener("click",()=>{saveProgress();showMessage((I18N[state.settings.language]||I18N.ko).saved,850)});
+  $("openSettingsBtn").addEventListener("click",openSettings);
+  $("exitToHomeBtn").addEventListener("click",()=>{saveProgress();goHome()});
+  $("settingsBackBtn").addEventListener("click",closeSettings);
+  $("languageSelect").addEventListener("change",e=>{state.settings.language=e.target.value;saveProgress();applyLanguage();refreshUI()});
+  $("soundToggle").addEventListener("change",e=>{state.settings.sound=e.target.checked;saveProgress()});
+  $("sfxToggle").addEventListener("change",e=>{state.settings.sfx=e.target.checked;saveProgress()});
+  $("maxFpsSelect").addEventListener("change",e=>{
+    state.settings.maxFps=Number(e.target.value)||0;
+    frameCapLastMs=0;
+    saveProgress();
+    showMessage(state.settings.maxFps>0?`최대 ${state.settings.maxFps} FPS로 설정`:"FPS 제한 해제",900);
+  });
+  $("openBugBtn").addEventListener("click",()=>{$("settingsScreen").style.display="none";$("bugScreen").style.display="flex";setPaused(true,"bug",true)});
+  $("bugBackBtn").addEventListener("click",()=>{$("bugScreen").style.display="none";$("settingsScreen").style.display="flex";setPaused(true,"settings",true)});
+  $("submitBugBtn").addEventListener("click",submitBug);
+  $("createRoomBtn").addEventListener("click",createRoom);
+  $("openJoinBtn").addEventListener("click",()=>{$("home").style.display="none";$("joinScreen").style.display="flex";$("joinStatus").textContent=""});
+  $("roomCodeInput").addEventListener("input",e=>{
+    const v=e.target.value.trim().toUpperCase();
+    e.target.value=v;
+    net.codeTypingStarted=v.length>0;
+    net.codeWasComplete=v.length>=6;
+  });
+  $("joinBackBtn").addEventListener("click",()=>{$("joinScreen").style.display="none";$("home").style.display="flex"});
+  $("joinRoomBtn").addEventListener("click",joinRoom);
+  $("soloBtn").addEventListener("click",()=>startSolo(false));
+  $("tutorialBtn").addEventListener("click",()=>startSolo(true));
+  $("startMultiBtn").addEventListener("click",startMultiplayer);
+  $("leaveRoomBtn").addEventListener("click",goHome);
+  $("closeShop").addEventListener("click",()=>toggleShop(false));
+  ui.upgradeBtn.addEventListener("click",upgradeWeapon);
+  $("nextTutorial").addEventListener("click",nextTutorial);
+  $("skipTutorial").addEventListener("click",()=>{$("tutorial").style.display="none";showMessage("튜토리얼을 건너뛰었습니다.",700)});
+  $("spectateBtn").addEventListener("click",startSpectate);
+  $("reviveBtn").addEventListener("click",requestRevive);
+  $("spectateReviveBtn").addEventListener("click",requestRevive);
+  $("spectatePrev").addEventListener("click",()=>cycleSpectate(-1));
+  $("spectateNext").addEventListener("click",()=>cycleSpectate(1));
+  $("homeBtnFromOver").addEventListener("click",goHome);
+  $("viewEndingBtn").addEventListener("click",openEndingCredits);
+  $("creditsHomeBtn").addEventListener("click",closeEndingCreditsToHome);
+  $("winHomeBtn").addEventListener("click",goHome);
+
+  setPortalState();applyLanguage();refreshUI();renderShop();updateBugInboxCount();updateReviveUI();$("languageSelect").value=state.settings.language;$("soundToggle").checked=state.settings.sound;$("sfxToggle").checked=state.settings.sfx;
+
+  let last=performance.now()/1000;
+  let frameCapLastMs=0;
+  engine.runRenderLoop(()=>{
+    const nowMs=performance.now();
+    const maxFps=Number(state.settings.maxFps)||0;
+
+    if(maxFps>0){
+      const minFrameMs=1000/maxFps;
+      if(frameCapLastMs&&nowMs-frameCapLastMs<minFrameMs)return;
+      frameCapLastMs=nowMs-((nowMs-frameCapLastMs)%minFrameMs);
+    }else{
+      frameCapLastMs=nowMs;
+    }
+
+    const now=nowMs/1000,dt=Math.min(.033,now-last);last=now;
+    if(state.inGame&&!state.gameOver){
+      if(!state.paused){
+        if(!state.dead&&!state.shopOpen){
+          movePlayer(dt);updateHealthRegen(dt);
+        }
+        if(!state.isMultiplayer||state.isHost){
+          updateEnemies(dt);
+
+          const activeDims=new Set();
+          if(!state.dead&&state.currentDim>=0)activeDims.add(state.currentDim);
+          if(state.isHost)net.remoteStates.forEach(s=>{
+            if(!s.dead&&s.dim>=0)activeDims.add(s.dim);
+          });
+
+          if(!state.natureMode)activeDims.forEach(dim=>{
+            spawnTimers[dim]+=dt;
+            const count=enemies.filter(e=>!e.isBoss&&e.dim===dim).length;
+            if(dim<3&&spawnTimers[dim]>2.4&&count<6){
+              spawnTimers[dim]=0;spawnEnemy(false,dim);
+            }
+            if(dim===2&&state.dimKills[2]>=12&&!state.boss1Defeated&&!enemies.some(e=>e.bossLevel===1&&e.dim===2)){
+              spawnEnemy(true,2);
+            }
+            if(dim===3&&state.boss1Defeated&&!state.boss2Defeated&&!enemies.some(e=>e.bossLevel===2&&e.dim===3)){
+              spawnEnemy(true,3);
+            }
+          });
+        }else{
+          updateEnemies(dt);
+        }
+
+        sendPlayerState(now);
+        broadcastEnemies(now);
+        updateShopTimer();
+        updateNatureTrail(dt);
+      }
+      updateAimFromPointer();updateBlockPose();renderRemotePlayers();
+    }
+    if(!state.paused)animatePortals(now);
+    updateCamera();refreshUI();cooldowns();updateDebugPanel();scene.render();
+  });
+  window.addEventListener("beforeunload",()=>{
+    if(state.isMultiplayer&&state.isHost&&state.roomCode)markRoomGone(state.roomCode,Date.now());
+  });
+  window.addEventListener("resize",()=>engine.resize());
+})();
+</script>
+</body>
+</html>
