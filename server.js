@@ -4,6 +4,8 @@ const port=Number(process.env.PORT||3000),file=process.env.YEON_DATA_FILE||path.
 const seed={users:[],servers:[],channels:[],members:[],messages:[],friends:[],sessions:[]};
 let db=seed;try{const parsed=JSON.parse(fs.readFileSync(file));for(const key of Object.keys(seed))if(Array.isArray(parsed[key]))db[key]=parsed[key]}catch{}
 const streams=new Map();
+const pendingSignups=new Map();
+const emailRateLimit=new Map();
 const uid=()=>crypto.randomUUID(),now=()=>new Date().toISOString(),safe=(v,max=64)=>String(v??'').trim().slice(0,max);
 function persist(){fs.mkdirSync(path.dirname(file),{recursive:true});let temp=file+'.tmp';fs.writeFileSync(temp,JSON.stringify(db));fs.renameSync(temp,file)}
 function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});res.end(JSON.stringify(data))}
@@ -24,12 +26,30 @@ const server=http.createServer(async(req,res)=>{
  if(route==='/api/health'&&req.method==='GET')return json(res,200,{ok:true,app:'YEON',version:'0.4.0'});
  try{
  const b=req.method==='POST'?await readBody(req):{};
- if(route==='/api/register'&&req.method==='POST'){
-  const name=safe(b.name,24),password=String(b.password||'');
-  if(!/^[a-zA-Z0-9_가-힣]{2,24}$/.test(name)||password.length<8||password.length>128)return json(res,400,{error:'이름은 2~24자(한글·영문·숫자·밑줄), 비밀번호는 8~128자여야 합니다.'});
-  if(db.users.some(u=>u.name.toLowerCase()===name.toLowerCase()))return json(res,409,{error:'이미 사용 중인 이름입니다.'});
-  const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex'),user={id:uid(),name,salt,hash};
-  db.users.push(user);const token=crypto.randomBytes(32).toString('hex');db.sessions.push({token,userId:user.id});persist();return json(res,201,{token,me:publicUser(user)})
+ if(route==='/api/register'&&req.method==='POST')return json(res,410,{error:'이메일 인증을 거쳐 계정을 만들어 주세요.'});
+ if(route==='/api/register/start'&&req.method==='POST'){
+  const name=safe(b.name,24),password=String(b.password||''),email=safe(b.email,254).toLowerCase();
+  if(!/^[a-zA-Z0-9_가-힣]{2,24}$/.test(name)||password.length<8||password.length>128)return json(res,400,{error:'이름은 2~24자, 비밀번호는 8~128자로 입력해 주세요.'});
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return json(res,400,{error:'올바른 이메일 주소를 입력해 주세요.'});
+  if(db.users.some(u=>u.name.toLowerCase()===name.toLowerCase()||u.email===email))return json(res,409,{error:'이미 등록된 이름 또는 이메일입니다.'});
+  if(!process.env.RESEND_API_KEY||!process.env.YEON_EMAIL_FROM)return json(res,503,{error:'이메일 인증 발송 설정이 아직 완료되지 않았습니다. 서버 관리자에게 문의해 주세요.'});
+  const last=emailRateLimit.get(email)||0;if(Date.now()-last<60000)return json(res,429,{error:'인증 메일은 1분 후 다시 요청할 수 있습니다.'});
+  const code=String(crypto.randomInt(100000,1000000));
+  const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex');
+  const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+process.env.RESEND_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({from:process.env.YEON_EMAIL_FROM,to:[email],subject:'[YEON] 이메일 인증번호',text:'YEON 이메일 인증번호: '+code+'\n10분 안에 입력해 주세요.'})});
+  if(!response.ok){console.error('Mail send failed',response.status);return json(res,502,{error:'인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.'})}
+  pendingSignups.set(email,{name,salt,hash,codeHash:crypto.createHash('sha256').update(code).digest('hex'),expires:Date.now()+600000,attempts:0});
+  emailRateLimit.set(email,Date.now());return json(res,200,{ok:true,expiresIn:600});
+ }
+ if(route==='/api/register/verify'&&req.method==='POST'){
+  const email=safe(b.email,254).toLowerCase(),code=String(b.code||'').trim(),entry=pendingSignups.get(email);
+  if(!entry||Date.now()>entry.expires){pendingSignups.delete(email);return json(res,400,{error:'인증번호가 만료되었습니다. 다시 요청해 주세요.'})}
+  entry.attempts++;if(entry.attempts>5){pendingSignups.delete(email);return json(res,429,{error:'입력 횟수를 초과했습니다. 다시 요청해 주세요.'})}
+  const actual=crypto.createHash('sha256').update(code).digest(),expected=Buffer.from(entry.codeHash,'hex');
+  if(!/^\d{6}$/.test(code)||!crypto.timingSafeEqual(actual,expected))return json(res,400,{error:'인증번호가 올바르지 않습니다.'});
+  if(db.users.some(u=>u.name.toLowerCase()===entry.name.toLowerCase()||u.email===email))return json(res,409,{error:'이미 등록된 계정입니다.'});
+  const user={id:uid(),name:entry.name,email,salt:entry.salt,hash:entry.hash,verified:true};
+  db.users.push(user);const token=crypto.randomBytes(32).toString('hex');db.sessions.push({token,userId:user.id});pendingSignups.delete(email);persist();return json(res,201,{token,me:publicUser(user)})
  }
  if(route==='/api/login'&&req.method==='POST'){
   const user=db.users.find(u=>u.name.toLowerCase()===safe(b.name,24).toLowerCase());
