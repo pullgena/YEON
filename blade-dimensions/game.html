@@ -88,6 +88,56 @@
 
 
 
+  .wifiTestBox{
+    margin-top:10px;padding:16px;border-radius:14px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.10);
+  }
+  .wifiTestVisual{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:8px;padding:14px 8px 8px;
+  }
+  .wifiBigIcon{
+    position:relative;width:118px;height:86px;
+    display:flex;align-items:flex-end;justify-content:center;
+  }
+  .wifiArc{
+    position:absolute;left:50%;transform:translateX(-50%);
+    border:8px solid #fff;border-left-color:transparent;border-right-color:transparent;
+    border-bottom-color:transparent;border-radius:50%;
+    opacity:.18;transition:opacity .15s,filter .15s;
+  }
+  .wifiArc.a4{width:108px;height:108px;top:-8px}
+  .wifiArc.a3{width:82px;height:82px;top:9px}
+  .wifiArc.a2{width:56px;height:56px;top:26px}
+  .wifiArc.a1{width:30px;height:30px;top:43px}
+  .wifiDot{
+    position:absolute;bottom:0;width:13px;height:13px;border-radius:50%;
+    background:#fff;opacity:.18;transition:opacity .15s,filter .15s;
+  }
+  .wifiBigIcon[data-level="4"] .a4,
+  .wifiBigIcon[data-level="4"] .a3,
+  .wifiBigIcon[data-level="4"] .a2,
+  .wifiBigIcon[data-level="4"] .a1,
+  .wifiBigIcon[data-level="4"] .wifiDot,
+  .wifiBigIcon[data-level="3"] .a3,
+  .wifiBigIcon[data-level="3"] .a2,
+  .wifiBigIcon[data-level="3"] .a1,
+  .wifiBigIcon[data-level="3"] .wifiDot,
+  .wifiBigIcon[data-level="2"] .a2,
+  .wifiBigIcon[data-level="2"] .a1,
+  .wifiBigIcon[data-level="2"] .wifiDot,
+  .wifiBigIcon[data-level="1"] .a1,
+  .wifiBigIcon[data-level="1"] .wifiDot{
+    opacity:1;filter:drop-shadow(0 0 6px rgba(105,190,255,.55));
+  }
+  .wifiBigIcon[data-level="0"] .wifiDot{opacity:.25}
+  .wifiTestLabel{font-weight:900;font-size:16px;margin-top:2px}
+  .wifiTestSub{font-size:12px;color:#9fa7b5;text-align:center}
+  .wifiStrengthRange{width:min(360px,100%);margin:12px auto 4px;display:block;accent-color:#64b5ff}
+  .wifiLevels{display:flex;justify-content:space-between;font-size:11px;color:#949baa;margin-top:2px}
+  .wifiTestActions{display:flex;justify-content:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+
   .weakWifiBanner{
     position:fixed;z-index:950;left:50%;top:12px;transform:translateX(-50%);
     display:none;align-items:center;gap:9px;
@@ -435,12 +485,36 @@
           <option value="240">240 FPS</option>
         </select>
       </div>
-      <div class="settingRow">
+      <div class="settingRow" style="display:block">
         <div>
-          <b>📶 Wi-Fi 설정</b>
-          <div class="status">테스트할 때 Windows Wi-Fi 빠른 설정을 바로 엽니다.</div>
+          <b>📶 Wi-Fi 상태 테스트</b>
+          <div class="status">전파 세기를 직접 낮춰서 경고 화면이 제대로 뜨는지 테스트합니다.</div>
         </div>
-        <button id="settingsWifiBtn">Wi-Fi 설정 열기</button>
+
+        <div class="wifiTestBox">
+          <div class="wifiTestVisual">
+            <div class="wifiBigIcon" id="wifiBigIcon" data-level="4">
+              <span class="wifiArc a4"></span>
+              <span class="wifiArc a3"></span>
+              <span class="wifiArc a2"></span>
+              <span class="wifiArc a1"></span>
+              <span class="wifiDot"></span>
+            </div>
+            <div class="wifiTestLabel" id="wifiTestLabel">전파 강함</div>
+            <div class="wifiTestSub" id="wifiTestSub">실제 네트워크 대신 테스트 상태가 적용됩니다.</div>
+          </div>
+
+          <input class="wifiStrengthRange" id="wifiStrengthRange"
+                 type="range" min="0" max="4" step="1" value="4">
+          <div class="wifiLevels">
+            <span>없음</span><span>매우 약함</span><span>약함</span><span>보통</span><span>강함</span>
+          </div>
+
+          <div class="wifiTestActions">
+            <button id="wifiTestApplyBtn">테스트 시작</button>
+            <button id="wifiTestRealBtn" class="secondary">실제 상태로 돌아가기</button>
+          </div>
+        </div>
       </div>
       <div class="settingRow">
         <div><b id="bugLabel">버그 제보</b><div class="status" id="bugHelp">발견한 문제를 개발용 제보함에 저장합니다.</div></div>
@@ -648,7 +722,61 @@
     if(!show&&$("offlineStatus"))$("offlineStatus").textContent="";
   }
 
+  function updateWifiTestVisual(){
+    const icon=$("wifiBigIcon");
+    const label=$("wifiTestLabel");
+    const range=$("wifiStrengthRange");
+    if(!icon||!label||!range)return;
+
+    wifiTestLevel=Number(range.value)||0;
+    icon.dataset.level=String(wifiTestLevel);
+
+    const labels=["전파 없음","전파 매우 약함","전파 약함","전파 보통","전파 강함"];
+    label.textContent=labels[wifiTestLevel]||"전파 없음";
+
+    if(wifiTestMode)applyWifiTestState();
+  }
+
+  function applyWifiTestState(){
+    if(!wifiTestMode)return;
+
+    if(wifiTestLevel===0){
+      setWeakWifiBanner(false);
+      setOfflineScreen(true);
+      return;
+    }
+
+    setOfflineScreen(false);
+
+    if(wifiTestLevel<=2){
+      const fakePing=wifiTestLevel===1?520:320;
+      setWeakWifiBanner(true,fakePing);
+    }else{
+      setWeakWifiBanner(false);
+    }
+  }
+
+  function startWifiTest(){
+    wifiTestMode=true;
+    weakWifiBadCount=0;
+    weakWifiGoodCount=0;
+    updateWifiTestVisual();
+    applyWifiTestState();
+    showMessage("📶 Wi-Fi 테스트 모드 시작",900);
+  }
+
+  function stopWifiTest(){
+    wifiTestMode=false;
+    weakWifiBadCount=0;
+    weakWifiGoodCount=0;
+    setWeakWifiBanner(false);
+    refreshConnectivity();
+    checkNetworkQuality();
+    showMessage("📶 실제 네트워크 상태로 돌아왔습니다.",900);
+  }
+
   async function refreshConnectivity(){
+    if(wifiTestMode){applyWifiTestState();return}
     let online=navigator.onLine!==false;
     try{
       if(window.yeonNative?.isOnline){
@@ -660,6 +788,8 @@
   let weakWifiBadCount=0;
   let weakWifiGoodCount=0;
   let weakWifiTimer=null;
+  let wifiTestMode=false;
+  let wifiTestLevel=4;
 
   function setWeakWifiBanner(show,ping=null){
     const banner=$("weakWifiBanner");
@@ -674,6 +804,7 @@
   }
 
   async function checkNetworkQuality(){
+    if(wifiTestMode){applyWifiTestState();return}
     if(navigator.onLine===false){
       weakWifiBadCount=0;
       weakWifiGoodCount=0;
@@ -2776,16 +2907,21 @@
   $("creditsHomeBtn").addEventListener("click",closeEndingCreditsToHome);
   $("winHomeBtn").addEventListener("click",goHome);
   $("openWifiSettingsBtn").addEventListener("click",openWifiSettings);
-  $("settingsWifiBtn").addEventListener("click",openWifiSettings);
+  $("wifiStrengthRange").addEventListener("input",updateWifiTestVisual);
+  $("wifiTestApplyBtn").addEventListener("click",startWifiTest);
+  $("wifiTestRealBtn").addEventListener("click",stopWifiTest);
   window.addEventListener("online",refreshConnectivity);
   window.addEventListener("offline",refreshConnectivity);
   if(window.yeonNative?.onConnectivityChanged){
-    window.yeonNative.onConnectivityChanged(online=>setOfflineScreen(!online));
+    window.yeonNative.onConnectivityChanged(online=>{
+      if(!wifiTestMode)setOfflineScreen(!online);
+    });
   }
 
   setPortalState();applyLanguage();refreshUI();renderShop();updateBugInboxCount();updateReviveUI();$("languageSelect").value=state.settings.language;$("soundToggle").checked=state.settings.sound;$("sfxToggle").checked=state.settings.sfx;
   refreshConnectivity();
   startNetworkQualityMonitor();
+  updateWifiTestVisual();
 
   let last=performance.now()/1000;
   let frameCapLastMs=0;
