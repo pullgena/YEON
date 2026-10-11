@@ -2,6 +2,7 @@
 const {app, BrowserWindow, ipcMain} = require('electron');
 const path = require('node:path');
 let windowRef;
+let allowExit = false;
 function createWindow() {
   windowRef = new BrowserWindow({
     width: 1200, height: 780, minWidth: 680, minHeight: 400,
@@ -9,8 +10,15 @@ function createWindow() {
     webPreferences: {preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true}
   });
   windowRef.loadFile('index.html');
+  windowRef.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'q') {
+      event.preventDefault();
+      allowExit = true;
+      windowRef.close();
+    }
+  });
   windowRef.on('close', event => {
-    if (!windowRef.isDestroyed()) {
+    if (!allowExit && !windowRef.isDestroyed()) {
       event.preventDefault();
       windowRef.webContents.send('show-mission');
       if (windowRef.isMinimized()) windowRef.restore();
