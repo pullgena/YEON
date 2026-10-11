@@ -66,8 +66,8 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.8.0
-          name: YEON v0.8.0 - Windows
+          tag_name: v0.8.1
+          name: YEON v0.8.1 - Windows
           target_commitish: ${{ github.sha }}
           body: |
             Windows용 YEON 채팅 앱 빌드입니다.
