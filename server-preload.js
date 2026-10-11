@@ -1,0 +1,1 @@
+const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('terminal',Object.freeze({status:()=>ipcRenderer.invoke('server-status'),start:()=>ipcRenderer.invoke('server-start'),stop:()=>ipcRenderer.invoke('server-stop'),open:()=>ipcRenderer.invoke('server-open')}));
