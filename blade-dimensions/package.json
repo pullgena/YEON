@@ -1,6 +1,6 @@
 {
   "name": "blade-dimensions",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Blade Dimensions multiplayer 3D action game",
   "main": "main.js",
   "author": "YEON",
@@ -16,24 +16,9 @@
   "build": {
     "appId": "com.yeon.bladedimensions",
     "productName": "Blade Dimensions",
-    "files": [
-      "game.html",
-      "main.js",
-      "package.json"
-    ],
-    "directories": {
-      "output": "dist"
-    },
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
+    "files": ["game.html", "main.js", "preload.js", "package.json"],
+    "directories": {"output": "dist"},
+    "win": {"target": [{"target": "nsis", "arch": ["x64"]}]},
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
