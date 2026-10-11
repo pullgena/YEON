@@ -3,5 +3,7 @@ contextBridge.exposeInMainWorld('yeon',Object.freeze({
  openWifi:()=>ipcRenderer.invoke('open-wifi-settings'),
  retry:()=>ipcRenderer.invoke('retry-connection'),
  chooseMode:(mode,url)=>ipcRenderer.invoke('choose-mode',mode,url),
- showServers:()=>ipcRenderer.invoke('show-servers')
+ showServers:()=>ipcRenderer.invoke('show-servers'),
+ enterCode:(code)=>ipcRenderer.invoke('enter-code',code),
+ openVeylo:()=>ipcRenderer.invoke('open-veylo')
 }));
