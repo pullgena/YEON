@@ -3,8 +3,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const PORT = Number(process.env.PORT || 3000);
-const DATA_FILE = path.join(__dirname, 'data.json');
+const PORT = process.env.PORT === '0' ? 0 : Number(process.env.PORT || 3000);
+const DATA_FILE = process.env.YEON_DATA_FILE || path.join(__dirname, 'data.json');
 const initial = { servers: [
   {id:'lounge', name:'YEON 라운지', icon:'Y', channels:[{id:'general',name:'일반'},{id:'introduce',name:'자기소개'},{id:'ideas',name:'아이디어'}]},
   {id:'games', name:'게임 모임', icon:'🎮', channels:[{id:'game-chat',name:'게임 채팅'},{id:'party',name:'파티 모집'}]}
@@ -55,4 +55,9 @@ const server=http.createServer((req,res)=>{
  });
 });
 setInterval(()=>{for(const [id,user]of online)if(Date.now()-user.time>45000)online.delete(id);broadcast('online',[...online.values()])},15000).unref();
-server.listen(PORT,()=>console.log('YEON running at http://localhost:'+PORT));
+if (process.env.YEON_DESKTOP === '1') {
+ server.listen(PORT, '127.0.0.1', () => console.log('YEON desktop at http://127.0.0.1:'+server.address().port));
+} else {
+ server.listen(PORT, () => console.log('YEON running at http://localhost:'+PORT));
+}
+module.exports = server;
