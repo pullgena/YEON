@@ -87,6 +87,42 @@
   .spectateBar button{padding:8px 10px}
 
 
+
+  .offlineScreen{
+    position:fixed;inset:0;z-index:1000;display:none;
+    background:#000;color:#fff;align-items:center;justify-content:center;
+    flex-direction:column;text-align:center;padding:28px;
+  }
+  .offlineIconWrap{
+    position:relative;width:112px;height:112px;
+    display:flex;align-items:center;justify-content:center;margin-bottom:20px;
+  }
+  .offlineGlobe{
+    font-size:86px;line-height:1;filter:grayscale(1) brightness(2.2);
+  }
+  .offlineX{
+    position:absolute;right:2px;bottom:6px;width:42px;height:42px;
+    display:flex;align-items:center;justify-content:center;
+    border-radius:50%;background:#000;border:4px solid #fff;
+    font-size:34px;font-weight:1000;line-height:1;color:#fff;
+  }
+  .offlineTitle{
+    font-size:clamp(28px,5vw,44px);font-weight:950;margin:0 0 12px;
+    letter-spacing:-.03em;
+  }
+  .offlineDesc{
+    margin:0 0 18px;color:#a9a9a9;font-size:14px;line-height:1.55;
+  }
+  .offlineWifiBtn{
+    padding:8px 12px;border-radius:9px;background:#1d1d1d!important;
+    color:#f4f4f4!important;border:1px solid #3a3a3a!important;
+    font-size:12px!important;font-weight:750!important;
+  }
+  .offlineWifiBtn:hover{background:#292929!important}
+  .offlineStatus{
+    min-height:18px;margin-top:10px;font-size:11px;color:#868686;
+  }
+
   .catNetworkScreen{position:fixed;inset:0;z-index:200;display:none;background:#fff;color:#111;align-items:center;justify-content:center;flex-direction:column;overflow:hidden}
   .catStage{position:relative;width:360px;height:390px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px;box-sizing:border-box}
   .heroNet{position:relative;width:160px;height:205px;transform-origin:50% 80%;margin-top:120px}
@@ -489,6 +525,17 @@
   </div>
 </div>
 
+<div class="offlineScreen" id="offlineScreen">
+  <div class="offlineIconWrap" aria-hidden="true">
+    <div class="offlineGlobe">🌐</div>
+    <div class="offlineX">×</div>
+  </div>
+  <h1 class="offlineTitle">와이파이가 없어요</h1>
+  <p class="offlineDesc">인터넷에 연결한 뒤 게임을 계속할 수 있어요.</p>
+  <button class="offlineWifiBtn" id="openWifiSettingsBtn">와이파이 설정하러 가기</button>
+  <div class="offlineStatus" id="offlineStatus"></div>
+</div>
+
 <div class="catNetworkScreen" id="catNetworkScreen">
   <div class="catStage">
     <div class="catBubble" id="catNetworkBubble">NO, NO</div>
@@ -555,6 +602,45 @@
 <script>
 (() => {
   const $=id=>document.getElementById(id);
+  let lastKnownOnline=true;
+
+  function setOfflineScreen(show){
+    const screen=$("offlineScreen");
+    if(!screen)return;
+    screen.style.display=show?"flex":"none";
+    lastKnownOnline=!show;
+    if(!show&&$("offlineStatus"))$("offlineStatus").textContent="";
+  }
+
+  async function refreshConnectivity(){
+    let online=navigator.onLine!==false;
+    try{
+      if(window.yeonNative?.isOnline){
+        online=await window.yeonNative.isOnline();
+      }
+    }catch(_){}
+    setOfflineScreen(!online);
+  }
+
+  async function openWifiSettings(){
+    const status=$("offlineStatus");
+    if(status)status.textContent="Windows 와이파이 설정을 여는 중...";
+    try{
+      if(window.yeonNative?.openWifiQuickSettings){
+        const result=await window.yeonNative.openWifiQuickSettings();
+        if(status){
+          status.textContent=result?.opened
+            ?"빠른 설정에서 Wi-Fi 항목을 열었습니다."
+            :"Wi-Fi 설정 페이지를 열었습니다.";
+        }
+      }else{
+        if(status)status.textContent="Windows 앱에서 사용할 수 있는 기능입니다.";
+      }
+    }catch(_){
+      if(status)status.textContent="Wi-Fi 설정을 열지 못했습니다.";
+    }
+  }
+
   const canvas=$("game");
   const engine=new BABYLON.Engine(canvas,true);
   const scene=new BABYLON.Scene(engine);
@@ -911,8 +997,7 @@
     state.yaw-=dx*.0065;state.pitch-=dy*.005;
     state.pitch=Math.max(-.72,Math.min(.42,state.pitch));
   });
-  function stopDrag(e){
-    if(!drag.active)return;drag.active=false;canvas.style.cursor="default";
+  function stopDrag(e){    if(!drag.active)return;drag.active=false;canvas.style.cursor="default";
     try{if(drag.id!==null)canvas.releasePointerCapture(drag.id)}catch(_){}
     drag.id=null;
   }
@@ -998,6 +1083,7 @@
       sendPlayerState(performance.now()/1000,true);
     }
   }
+
   function checkPortals(){
     const now=performance.now()/1000;if(now<state.teleportLock||state.dead||state.shopOpen)return;
     if(state.currentDim<0){
@@ -1910,8 +1996,7 @@
   const tutorialSteps=[
     {t:"카메라 조작",x:"마우스 오른쪽 버튼을 누른 채 드래그하면 화면이 회전합니다. 이전 버전의 화면 회전 버그를 이 방식으로 수정했습니다.",k:["우클릭 + 드래그: 회전","마우스 휠: 확대/축소"]},
     {t:"이동",x:"로블록스처럼 카메라가 보고 있는 방향을 기준으로 움직입니다.",k:["W: 앞으로","A/D: 좌우","S: 뒤로","Shift: 달리기"]},
-    {t:"점프",x:"Space를 누르면 점프합니다.",k:["Space: 점프"]},
-    {t:"기본 공격",x:"적이 앞에 있을 때 좌클릭으로 검을 휘두릅니다.",k:["좌클릭: 기본 베기"]},
+    {t:"점프",x:"Space를 누르면 점프합니다.",k:["Space: 점프"]},    {t:"기본 공격",x:"적이 앞에 있을 때 좌클릭으로 검을 휘두릅니다.",k:["좌클릭: 기본 베기"]},
     {t:"방어와 회피",x:"F를 누르면 용사가 검을 몸 앞에 세워 방어합니다. 피해를 받지 않고 5초가 지나면 HP가 자동으로 회복됩니다.",k:["F: 방어 모션","E: 회피","5초 후 HP 자동 회복"]},
     {t:"전투 스킬",x:"Q를 누르면 용사가 실제로 한 바퀴 회전하면서 주변 적을 베고, R은 앞으로 돌진하며 공격합니다.",k:["Q: 실제 회전 베기","R: 돌진 베기"]},
     {t:"무기·갑옷 상점",x:"B를 누르면 상점이 열립니다. 검뿐 아니라 피해를 줄여주는 갑옷도 구매하고 장착할 수 있습니다.",k:["B: 상점","60초 제한","상점 이용 중 공격 대상 제외"]},
@@ -1996,7 +2081,8 @@
 
   function resetAllGameData(){
     const firstConfirm=confirm(
-      "정말 게임 데이터를 초기화할까요?\n\n" +      "골드, 무기, 갑옷, 강화, 차원 진행도, 설정, 버그 제보가 모두 삭제됩니다."
+      "정말 게임 데이터를 초기화할까요?\n\n" +
+      "골드, 무기, 갑옷, 강화, 차원 진행도, 설정, 버그 제보가 모두 삭제됩니다."
     );
     if(!firstConfirm)return;
 
@@ -2596,8 +2682,15 @@
   $("viewEndingBtn").addEventListener("click",openEndingCredits);
   $("creditsHomeBtn").addEventListener("click",closeEndingCreditsToHome);
   $("winHomeBtn").addEventListener("click",goHome);
+  $("openWifiSettingsBtn").addEventListener("click",openWifiSettings);
+  window.addEventListener("online",refreshConnectivity);
+  window.addEventListener("offline",refreshConnectivity);
+  if(window.yeonNative?.onConnectivityChanged){
+    window.yeonNative.onConnectivityChanged(online=>setOfflineScreen(!online));
+  }
 
   setPortalState();applyLanguage();refreshUI();renderShop();updateBugInboxCount();updateReviveUI();$("languageSelect").value=state.settings.language;$("soundToggle").checked=state.settings.sound;$("sfxToggle").checked=state.settings.sfx;
+  refreshConnectivity();
 
   let last=performance.now()/1000;
   let frameCapLastMs=0;
