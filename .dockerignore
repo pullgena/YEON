@@ -1,0 +1,7 @@
+node_modules
+dist
+.git
+.github
+*.json.tmp
+yeon-data.json
+local-chat-data.json
