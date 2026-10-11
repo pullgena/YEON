@@ -1,39 +1,49 @@
-name: Windows EXE release
+name: Build Windows EXE
 on:
   push:
-    branches: [main]
-    paths:
-      - 'electron-main.js'
-      - 'server.js'
-      - 'index.html'
-      - 'package.json'
-      - '.github/workflows/release.yml'
+    branches:
+      - main
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  build:
+  windows-exe:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
+      - name: Install
         run: npm install --no-audit --no-fund
-      - name: Build Windows installers
+      - name: Build EXE
+        shell: pwsh
         run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Publish release assets
+      - name: Upload EXE as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YEON-Windows-EXE
+          path: dist/*.exe
+          if-no-files-found: error
+      - name: Create release and attach EXE
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $version = (Get-Content package.json | ConvertFrom-Json).version
-          $tag = "v$version"
-          gh release view $tag 2>$null
+          $ErrorActionPreference = 'Stop'
+          $tag = 'v' + (Get-Content package.json -Raw | ConvertFrom-Json).version
+          gh release view $tag --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --target "${{ github.sha }}" --title "YEON $tag - Windows" --notes "Windows 설치형/포터블 EXE 앱. 프로토타입으로 로컬 채팅 서버를 실행합니다. 다중 사용자 인터넷 채팅에는 공유 서버가 필요합니다."
+            gh release create $tag --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "YEON $tag Windows" --notes "YEON Windows 64-bit installer and portable EXE."
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to create release' }
           }
-          gh release upload $tag "dist/*.exe" --clobber
+          $exeFiles = Get-ChildItem dist -Filter *.exe
+          if ($exeFiles.Count -eq 0) { throw 'No EXE was built' }
+          foreach ($exe in $exeFiles) {
+            gh release upload $tag $exe.FullName --repo "${{ github.repository }}" --clobber
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload $($exe.Name)" }
+          }
