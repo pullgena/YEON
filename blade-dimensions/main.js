@@ -34,24 +34,20 @@ public class KeySender {
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
-
 $KEYEVENTF_KEYUP = 0x0002
 $VK_LWIN = 0x5B
 $VK_A = 0x41
-
 [KeySender]::keybd_event($VK_LWIN, 0, 0, [UIntPtr]::Zero)
 [KeySender]::keybd_event($VK_A, 0, 0, [UIntPtr]::Zero)
 Start-Sleep -Milliseconds 60
 [KeySender]::keybd_event($VK_A, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
 [KeySender]::keybd_event($VK_LWIN, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
-
 Start-Sleep -Milliseconds 850
 
 $clicked = $false
 try {
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
-
   $root = [System.Windows.Automation.AutomationElement]::RootElement
   $buttons = $root.FindAll(
     [System.Windows.Automation.TreeScope]::Descendants,
@@ -60,15 +56,10 @@ try {
     $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
     $_.Current.Name -match 'Wi-?Fi|와이파이|무선'
   }
-
   $target = $buttons | Where-Object {
     $_.Current.Name -match '관리|Manage|연결|network|네트워크'
   } | Select-Object -First 1
-
-  if (-not $target) {
-    $target = $buttons | Select-Object -Last 1
-  }
-
+  if (-not $target) { $target = $buttons | Select-Object -Last 1 }
   if ($target) {
     $pattern = $null
     if ($target.TryGetCurrentPattern(
@@ -80,7 +71,6 @@ try {
     }
   }
 } catch {}
-
 if ($clicked) { Write-Output "CLICKED" } else { Write-Output "FALLBACK" }
 `;
 
@@ -94,6 +84,44 @@ if ($clicked) { Write-Output "CLICKED" } else { Write-Output "FALLBACK" }
     return { opened: false, fallback: true };
   } catch {
     return { opened: false, fallback: false };
+  }
+}
+
+async function getNetworkQuality() {
+  if (!net.isOnline()) {
+    return { online: false, ok: false, latency: null };
+  }
+
+  const start = Date.now();
+  let timeout;
+
+  try {
+    const controller = new AbortController();
+    timeout = setTimeout(() => controller.abort(), 3500);
+
+    const response = await net.fetch(
+      "https://www.gstatic.com/generate_204",
+      {
+        method: "GET",
+        cache: "no-store",
+        signal: controller.signal
+      }
+    );
+
+    clearTimeout(timeout);
+
+    return {
+      online: true,
+      ok: response.ok || response.status === 204,
+      latency: Date.now() - start
+    };
+  } catch {
+    if (timeout) clearTimeout(timeout);
+    return {
+      online: true,
+      ok: false,
+      latency: Date.now() - start
+    };
   }
 }
 
@@ -120,6 +148,7 @@ function createWindow() {
 }
 
 ipcMain.handle("network:is-online", () => net.isOnline());
+ipcMain.handle("network:quality", getNetworkQuality);
 ipcMain.handle("windows:open-wifi-quick-settings", openWifiQuickSettings);
 
 setInterval(() => {
