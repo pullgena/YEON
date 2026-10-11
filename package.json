@@ -1,7 +1,7 @@
 {
   "name": "yeon-chat",
   "productName": "YEON",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "description": "YEON independent client-server messaging app",
   "main": "electron-main.js",
@@ -26,7 +26,8 @@
       "preload.js",
       "server.js",
       "index.html",
-      "package.json"
+      "package.json",
+      "veylo/index.html"
     ],
     "directories": {
       "output": "dist"
