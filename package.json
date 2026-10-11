@@ -9,7 +9,7 @@
     "start": "electron .",
     "web": "node server.js",
     "dev": "electron .",
-    "dist": "electron-builder --win nsis portable",
+    "dist": "electron-builder --win nsis portable --publish never",
     "server": "node server.js"
   },
   "devDependencies": {
