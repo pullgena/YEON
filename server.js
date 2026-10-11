@@ -1,63 +1,83 @@
-// YEON — dependency-free real-time chat server (Node.js 20+)
-const http = require('node:http');
-const fs = require('node:fs');
-const path = require('node:path');
-const crypto = require('node:crypto');
-const PORT = process.env.PORT === '0' ? 0 : Number(process.env.PORT || 3000);
-const DATA_FILE = process.env.YEON_DATA_FILE || path.join(__dirname, 'data.json');
-const initial = { servers: [
-  {id:'lounge', name:'YEON 라운지', icon:'Y', channels:[{id:'general',name:'일반'},{id:'introduce',name:'자기소개'},{id:'ideas',name:'아이디어'}]},
-  {id:'games', name:'게임 모임', icon:'🎮', channels:[{id:'game-chat',name:'게임 채팅'},{id:'party',name:'파티 모집'}]}
-], messages: [] };
-let db = initial;
-try { const v=JSON.parse(fs.readFileSync(DATA_FILE,'utf8')); if(Array.isArray(v.servers)&&Array.isArray(v.messages))db=v; } catch {}
-const clients = new Set();
-const online = new Map();
-function save(){const tmp=DATA_FILE+'.tmp';fs.writeFileSync(tmp,JSON.stringify(db,null,2));fs.renameSync(tmp,DATA_FILE)}
-function send(res,code,obj){res.writeHead(code,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(obj))}
-function broadcast(event,data){for(const res of clients){try{res.write('event: '+event+'\ndata: '+JSON.stringify(data)+'\n\n')}catch{clients.delete(res)}}}
-function snapshot(){return {servers:db.servers,messages:db.messages.slice(-500),online:[...online.values()]}}
-function clean(s,max=80){return String(s||'').trim().slice(0,max)}
-function publicFile(res){fs.readFile(path.join(__dirname,'index.html'),(err,buf)=>{if(err){res.writeHead(500);res.end('Server error')}else{res.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'});res.end(buf)}})}
-const server=http.createServer((req,res)=>{
- const pathname=new URL(req.url,'http://localhost').pathname;
- if(req.method==='GET'&&(pathname==='/'||pathname==='/index.html'))return publicFile(res);
- if(req.method==='GET'&&pathname==='/api/state')return send(res,200,snapshot());
- if(req.method==='GET'&&pathname==='/api/events'){
-  res.writeHead(200,{'content-type':'text/event-stream; charset=utf-8','cache-control':'no-cache','connection':'keep-alive','x-accel-buffering':'no'});
-  res.write(': connected\n\n');clients.add(res);req.on('close',()=>clients.delete(res));return;
+'use strict';
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const port=Number(process.env.PORT||3000),file=process.env.YEON_DATA_FILE||path.resolve(process.cwd(),'yeon-data.json');
+const seed={users:[],servers:[],channels:[],members:[],messages:[],friends:[],sessions:[]};
+let db=seed;try{const parsed=JSON.parse(fs.readFileSync(file));for(const key of Object.keys(seed))if(Array.isArray(parsed[key]))db[key]=parsed[key]}catch{}
+const streams=new Map();
+const uid=()=>crypto.randomUUID(),now=()=>new Date().toISOString(),safe=(v,max=64)=>String(v??'').trim().slice(0,max);
+function persist(){fs.mkdirSync(path.dirname(file),{recursive:true});let temp=file+'.tmp';fs.writeFileSync(temp,JSON.stringify(db));fs.renameSync(temp,file)}
+function json(res,status,data){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});res.end(JSON.stringify(data))}
+function auth(req,url){const token=(req.headers.authorization||'').replace(/^Bearer /,'')||url.searchParams.get('token');const session=db.sessions.find(s=>s.token===token);return session&&db.users.find(u=>u.id===session.userId)}
+function publicUser(u){return {id:u.id,name:u.name}}
+function member(id,serverId){return db.members.some(m=>m.userId===id&&m.serverId===serverId)}
+function channels(id){return db.channels.filter(c=>member(id,c.serverId))}
+function accessibleRoom(user,room){if(room.startsWith('dm:')){const pair=room.slice(3).split(':');return pair.length===2&&pair.includes(user.id)&&pair.every(id=>db.users.some(u=>u.id===id))}const c=db.channels.find(c=>c.id===room);return Boolean(c&&member(user.id,c.serverId))}
+function emit(users,event,body){const payload='event: '+event+'\ndata: '+JSON.stringify(body)+'\n\n';for(const id of users){for(const stream of streams.get(id)||[])try{stream.write(payload)}catch{}}}
+function emitAll(event,body){emit([...streams.keys()],event,body)}
+function state(user){return {me:publicUser(user),users:db.users.filter(u=>u.id!==user.id).map(publicUser),servers:db.servers.filter(s=>member(user.id,s.id)),channels:channels(user.id),friends:db.friends.filter(f=>f.from===user.id||f.to===user.id),messages:db.messages.filter(m=>accessibleRoom(user,m.room)).slice(-1500)}}
+const mime={'/':'text/html','/index.html':'text/html'};
+function readBody(req){return new Promise((resolve,reject)=>{let data='';req.on('data',b=>{data+=b;if(data.length>25000){reject(Error('요청 크기 초과'));req.destroy()}});req.on('end',()=>{try{resolve(JSON.parse(data||'{}'))}catch{reject(Error('JSON 형식 오류'))}});req.on('error',reject)})}
+const server=http.createServer(async(req,res)=>{
+ const url=new URL(req.url,'http://localhost'),route=url.pathname;
+ if(req.method==='OPTIONS'){res.writeHead(204,{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization','Access-Control-Allow-Methods':'GET,POST,OPTIONS'});return res.end()}
+ if(req.method==='GET'&&(route==='/'||route==='/index.html')){return fs.readFile(path.join(__dirname,'index.html'),(error,data)=>{if(error)return json(res,500,{error:'파일 로드 실패'});res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});res.end(data)})}
+ if(route==='/api/health'&&req.method==='GET')return json(res,200,{ok:true,app:'YEON',version:'0.4.0'});
+ try{
+ const b=req.method==='POST'?await readBody(req):{};
+ if(route==='/api/register'&&req.method==='POST'){
+  const name=safe(b.name,24),password=String(b.password||'');
+  if(!/^[a-zA-Z0-9_가-힣]{2,24}$/.test(name)||password.length<8||password.length>128)return json(res,400,{error:'이름은 2~24자(한글·영문·숫자·밑줄), 비밀번호는 8~128자여야 합니다.'});
+  if(db.users.some(u=>u.name.toLowerCase()===name.toLowerCase()))return json(res,409,{error:'이미 사용 중인 이름입니다.'});
+  const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex'),user={id:uid(),name,salt,hash};
+  db.users.push(user);const token=crypto.randomBytes(32).toString('hex');db.sessions.push({token,userId:user.id});persist();return json(res,201,{token,me:publicUser(user)})
  }
- if(req.method!=='POST'||!['/api/message','/api/channel','/api/server','/api/presence'].includes(pathname))return send(res,404,{error:'찾을 수 없습니다.'});
- let raw='';req.on('data',chunk=>{raw+=chunk;if(raw.length>12000)req.destroy()});
- req.on('end',()=>{let body;try{body=JSON.parse(raw)}catch{return send(res,400,{error:'잘못된 요청입니다.'})}
-  if(pathname==='/api/message'){
-   const serverId=clean(body.serverId,50),channelId=clean(body.channelId,50);
-   if(!db.servers.some(s=>s.id===serverId&&s.channels.some(c=>c.id===channelId)))return send(res,400,{error:'채널이 없습니다.'});
-   const author=clean(body.author,24)||'익명',text=clean(body.text,2000);
-   if(!text)return send(res,400,{error:'내용을 입력해 주세요.'});
-   const msg={id:crypto.randomUUID(),serverId,channelId,author,text,time:new Date().toISOString()};
-   db.messages.push(msg);db.messages=db.messages.slice(-3000);save();broadcast('message',msg);return send(res,201,msg);
-  }
-  if(pathname==='/api/channel'){
-   const server=db.servers.find(s=>s.id===clean(body.serverId,50));if(!server)return send(res,404,{error:'서버가 없습니다.'});
-   const name=clean(body.name,30);if(!name)return send(res,400,{error:'채널 이름을 입력해 주세요.'});
-   const channel={id:crypto.randomUUID(),name};server.channels.push(channel);save();broadcast('state',snapshot());return send(res,201,channel);
-  }
-  if(pathname==='/api/server'){
-   const name=clean(body.name,36);if(!name)return send(res,400,{error:'서버 이름을 입력해 주세요.'});
-   const s={id:crypto.randomUUID(),name,icon:name[0].toUpperCase(),channels:[{id:crypto.randomUUID(),name:'일반'}]};
-   db.servers.push(s);save();broadcast('state',snapshot());return send(res,201,s);
-  }
-  const id=clean(body.id,80),name=clean(body.name,24);
-  if(!id)return send(res,400,{error:'사용자 ID가 필요합니다.'});
-  if(body.leave)online.delete(id);else online.set(id,{id,name:name||'익명',time:Date.now()});
-  broadcast('online',[...online.values()]);return send(res,200,{ok:true});
- });
+ if(route==='/api/login'&&req.method==='POST'){
+  const user=db.users.find(u=>u.name.toLowerCase()===safe(b.name,24).toLowerCase());
+  if(!user)return json(res,401,{error:'이름 또는 비밀번호가 잘못되었습니다.'});
+  const hash=crypto.scryptSync(String(b.password||''),user.salt,64),expected=Buffer.from(user.hash,'hex');
+  if(!crypto.timingSafeEqual(hash,expected))return json(res,401,{error:'이름 또는 비밀번호가 잘못되었습니다.'});
+  const token=crypto.randomBytes(32).toString('hex');db.sessions.push({token,userId:user.id});persist();return json(res,200,{token,me:publicUser(user)})
+ }
+ const user=auth(req,url);if(!user)return json(res,401,{error:'로그인이 필요합니다.'});
+ if(route==='/api/events'&&req.method==='GET'){
+  res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','Access-Control-Allow-Origin':'*'});res.write(': connected\n\n');if(!streams.has(user.id))streams.set(user.id,new Set());streams.get(user.id).add(res);req.on('close',()=>streams.get(user.id)?.delete(res));return
+ }
+ if(route==='/api/state'&&req.method==='GET')return json(res,200,state(user));
+ if(route==='/api/logout'&&req.method==='POST'){db.sessions=db.sessions.filter(s=>s.token!==((req.headers.authorization||'').replace(/^Bearer /,'')));persist();return json(res,200,{ok:true})}
+ if(route==='/api/servers'&&req.method==='POST'){
+  const name=safe(b.name,40);if(!name)return json(res,400,{error:'서버 이름을 입력하세요.'});
+  const s={id:uid(),name,owner:user.id,invite:crypto.randomBytes(5).toString('hex').toUpperCase()},c={id:uid(),serverId:s.id,name:'일반'};
+  db.servers.push(s);db.channels.push(c);db.members.push({serverId:s.id,userId:user.id});persist();emit([user.id],'refresh',{});return json(res,201,{server:s,channel:c})
+ }
+ if(route==='/api/join'&&req.method==='POST'){
+  const s=db.servers.find(s=>s.invite===safe(b.code,30).toUpperCase());if(!s)return json(res,404,{error:'올바른 초대 코드가 아닙니다.'});
+  if(!member(user.id,s.id))db.members.push({serverId:s.id,userId:user.id});persist();emit([user.id],'refresh',{});return json(res,200,{server:s})
+ }
+ if(route==='/api/channels'&&req.method==='POST'){
+  const s=db.servers.find(s=>s.id===b.serverId&&member(user.id,s.id));if(!s)return json(res,403,{error:'서버에 참여해야 합니다.'});
+  const name=safe(b.name,32);if(!name)return json(res,400,{error:'채널 이름을 입력하세요.'});
+  const c={id:uid(),serverId:s.id,name};db.channels.push(c);persist();emit(db.members.filter(m=>m.serverId===s.id).map(m=>m.userId),'refresh',{});return json(res,201,c)
+ }
+ if(route==='/api/friend'&&req.method==='POST'){
+  const target=db.users.find(u=>u.name.toLowerCase()===safe(b.name,24).toLowerCase());
+  if(!target||target.id===user.id)return json(res,404,{error:'사용자를 찾을 수 없습니다.'});
+  if(db.friends.some(f=>[f.from,f.to].includes(user.id)&&[f.from,f.to].includes(target.id)))return json(res,409,{error:'이미 친구 요청이 있습니다.'});
+  db.friends.push({id:uid(),from:user.id,to:target.id,status:'pending'});persist();emit([user.id,target.id],'refresh',{});return json(res,201,{ok:true})
+ }
+ if(route==='/api/friend/accept'&&req.method==='POST'){
+  const f=db.friends.find(f=>f.id===b.id&&f.to===user.id&&f.status==='pending');if(!f)return json(res,404,{error:'요청을 찾을 수 없습니다.'});
+  f.status='accepted';persist();emit([f.from,f.to],'refresh',{});return json(res,200,{ok:true})
+ }
+ if(route==='/api/messages'&&req.method==='POST'){
+  const room=safe(b.room,100),text=safe(b.text,2000);if(!room||!text)return json(res,400,{error:'대화 내용이 없습니다.'});
+  if(!accessibleRoom(user,room))return json(res,403,{error:'이 대화방을 이용할 수 없습니다.'});
+  let recipients=[];
+  if(room.startsWith('dm:')){const ids=room.slice(3).split(':');if(!db.friends.some(f=>f.status==='accepted'&&ids.includes(f.from)&&ids.includes(f.to)))return json(res,403,{error:'서로 친구가 되어야 DM을 보낼 수 있습니다.'});recipients=ids}
+  else{const c=db.channels.find(c=>c.id===room);recipients=db.members.filter(m=>m.serverId===c.serverId).map(m=>m.userId)}
+  const m={id:uid(),room,author:user.id,text,time:now()};db.messages.push(m);db.messages=db.messages.slice(-10000);persist();emit(recipients,'message',m);return json(res,201,m)
+ }
+ return json(res,404,{error:'존재하지 않는 기능입니다.'})
+ }catch(e){console.error(e);if(!res.headersSent)json(res,400,{error:e.message||'요청 실패'})}
 });
-setInterval(()=>{for(const [id,user]of online)if(Date.now()-user.time>45000)online.delete(id);broadcast('online',[...online.values()])},15000).unref();
-if (process.env.YEON_DESKTOP === '1') {
- server.listen(PORT, '127.0.0.1', () => console.log('YEON desktop at http://127.0.0.1:'+server.address().port));
-} else {
- server.listen(PORT, () => console.log('YEON running at http://localhost:'+PORT));
-}
-module.exports = server;
+if(require.main===module)server.listen(port,()=>console.log('YEON server http://localhost:'+server.address().port));
+module.exports=server;
