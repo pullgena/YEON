@@ -1,6 +1,6 @@
 const {app,BrowserWindow,dialog,ipcMain,net,shell}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
-let win,serverUrl=null,offline=false,timer;
+let win,serverUrl=null,offline=false,timer,loaded=false;
 function configPath(){return path.join(app.getPath('userData'),'config.json')}
 function isSafeURL(value){try{const u=new URL(value);return u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))}catch{return false}}
 async function chooseServer(){
@@ -17,7 +17,7 @@ async function checkConnection(){
  try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),3500);
  const response=await net.fetch(serverUrl+'/api/health',{signal:controller.signal,cache:'no-store'}).finally(()=>clearTimeout(timeout));
  if(!response.ok)throw Error('서버에 연결할 수 없습니다.');
- if(offline){offline=false;win.loadURL(serverUrl+'/')}
+ if(offline||!loaded){offline=false;loaded=true;win.loadURL(serverUrl+'/')}
  }catch{showOffline()}
 }
 ipcMain.handle('open-wifi-settings',async()=>{if(process.platform==='win32')await shell.openExternal('ms-settings:network-wifi');else await shell.openExternal('https://support.microsoft.com/windows')});
