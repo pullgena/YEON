@@ -436,6 +436,13 @@
         </select>
       </div>
       <div class="settingRow">
+        <div>
+          <b>📶 Wi-Fi 설정</b>
+          <div class="status">테스트할 때 Windows Wi-Fi 빠른 설정을 바로 엽니다.</div>
+        </div>
+        <button id="settingsWifiBtn">Wi-Fi 설정 열기</button>
+      </div>
+      <div class="settingRow">
         <div><b id="bugLabel">버그 제보</b><div class="status" id="bugHelp">발견한 문제를 개발용 제보함에 저장합니다.</div></div>
         <button id="openBugBtn">제보하기</button>
       </div>
@@ -2769,6 +2776,7 @@
   $("creditsHomeBtn").addEventListener("click",closeEndingCreditsToHome);
   $("winHomeBtn").addEventListener("click",goHome);
   $("openWifiSettingsBtn").addEventListener("click",openWifiSettings);
+  $("settingsWifiBtn").addEventListener("click",openWifiSettings);
   window.addEventListener("online",refreshConnectivity);
   window.addEventListener("offline",refreshConnectivity);
   if(window.yeonNative?.onConnectivityChanged){
