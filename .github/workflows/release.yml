@@ -1,21 +1,39 @@
-name: Publish release
+name: Windows EXE release
 on:
   push:
     branches: [main]
+    paths:
+      - 'electron-main.js'
+      - 'server.js'
+      - 'index.html'
+      - 'package.json'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create or update v0.1.0 release
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Windows installers
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Publish release assets
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.1.0 >/dev/null 2>&1; then
-            echo "Release v0.1.0 already exists"
-          else
-            gh release create v0.1.0 --target "${{ github.sha }}" --title "YEON v0.1.0" --notes "첫 공개 프로토타입: 실시간 텍스트 채팅, 서버/채널 생성, 온라인 사용자 표시, 메시지 저장."
-          fi
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $tag = "v$version"
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --target "${{ github.sha }}" --title "YEON $tag - Windows" --notes "Windows 설치형/포터블 EXE 앱. 프로토타입으로 로컬 채팅 서버를 실행합니다. 다중 사용자 인터넷 채팅에는 공유 서버가 필요합니다."
+          }
+          gh release upload $tag "dist/*.exe" --clobber
