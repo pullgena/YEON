@@ -32,7 +32,7 @@ const server=http.createServer(async(req,res)=>{
   if(!loopback.includes(req.socket.remoteAddress)||!loopback.includes(req.socket.localAddress))return json(res,403,{error:'로컬 테스트 계정은 내 컴퓨터에서만 만들 수 있습니다.'});
   const name=safe(b.name,24),password=String(b.password||''),email=safe(b.email,254).toLowerCase();
   if(!/^[a-zA-Z0-9_가-힣]{2,24}$/.test(name)||password.length<8||password.length>128)return json(res,400,{error:'이름은 2~24자, 비밀번호는 8~128자로 입력해 주세요.'});
-  if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))return json(res,400,{error:'올바른 이메일 주소를 입력해 주세요.'});
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return json(res,400,{error:'올바른 이메일 주소를 입력해 주세요.'});
   if(db.users.some(u=>u.name.toLowerCase()===name.toLowerCase()||u.email===email))return json(res,409,{error:'이미 등록된 이름 또는 이메일입니다.'});
   const salt=crypto.randomBytes(16).toString('hex'),hash=crypto.scryptSync(password,salt,64).toString('hex');
   const user={id:uid(),name,email,salt,hash,verified:false,localTest:true};
