@@ -26,6 +26,15 @@ const server=http.createServer(async(req,res)=>{
  if(route==='/api/health'&&req.method==='GET')return json(res,200,{ok:true,app:'YEON',version:'0.4.0'});
  try{
  const b=req.method==='POST'?await readBody(req):{};
+ if(route==='/api/nickname'&&req.method==='POST'){
+  if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.remoteAddress)||!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(req.socket.localAddress))return json(res,403,{error:'닉네임만 사용하는 기능은 이 컴퓨터의 로컬 서버에서만 지원합니다.'});
+  const name=safe(b.name,24);
+  if(!name||name.length>24||/[<>\\/]/.test(name))return json(res,400,{error:'올바른 닉네임을 1~24자로 입력하세요.'});
+  const user={id:uid(),name,guest:true};
+  db.users.push(user);
+  const token=crypto.randomBytes(32).toString('hex');db.sessions.push({token,userId:user.id});persist();
+  return json(res,201,{token,me:publicUser(user)})
+ }
  if(route==='/api/register'&&req.method==='POST')return json(res,410,{error:'이메일 인증을 거쳐 계정을 만들어 주세요.'});
  if(route==='/api/register/local'&&req.method==='POST'){
   const loopback=['127.0.0.1','::1','::ffff:127.0.0.1'];
