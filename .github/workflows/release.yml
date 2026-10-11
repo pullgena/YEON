@@ -2,6 +2,17 @@ name: Build Windows EXE
 on:
   push:
     branches: [main]
+    paths:
+      - 'electron-main.js'
+      - 'preload.js'
+      - 'server.js'
+      - 'index.html'
+      - 'veylo/**'
+      - 'server-terminal.js'
+      - 'server-preload.js'
+      - 'server-builder.config.js'
+      - 'package.json'
+      - '.github/workflows/release.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -51,7 +62,8 @@ jobs:
             dist/*.exe
             dist-server/*.exe
           if-no-files-found: error
-      - name: Publish GitHub release
+      - name: Publish GitHub release (optional; needs Contents write permission)
+        continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v0.7.1
