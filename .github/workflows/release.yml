@@ -1,0 +1,21 @@
+name: Publish release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create or update v0.1.0 release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0 >/dev/null 2>&1; then
+            echo "Release v0.1.0 already exists"
+          else
+            gh release create v0.1.0 --target "${{ github.sha }}" --title "YEON v0.1.0" --notes "첫 공개 프로토타입: 실시간 텍스트 채팅, 서버/채널 생성, 온라인 사용자 표시, 메시지 저장."
+          fi
