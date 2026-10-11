@@ -1,35 +1,59 @@
-const {app,BrowserWindow,dialog,ipcMain,net,shell}=require('electron');
+'use strict';
+const {app,BrowserWindow,ipcMain,net,shell}=require('electron');
 const fs=require('node:fs'),path=require('node:path');
-let win,serverUrl=null,offline=false,timer,loaded=false;
-function configPath(){return path.join(app.getPath('userData'),'config.json')}
-function isSafeURL(value){try{const u=new URL(value);return u.protocol==='https:'||(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))}catch{return false}}
-async function chooseServer(){
- let configured=process.env.YEON_SERVER_URL||'';
- try{configured=configured||JSON.parse(fs.readFileSync(configPath(),'utf8')).serverUrl}catch{}
- if(!configured){await dialog.showMessageBox({title:'YEON 서버 연결',message:'채팅 서버 주소가 필요합니다.',detail:'%APPDATA%\\YEON\\config.json에 {"serverUrl":"https://your-server.example"} 형식으로 서버 주소를 지정해 주세요.',buttons:['확인']});return null}
- return isSafeURL(configured)?new URL(configured).origin:null;
+let win,localServer=null,baseURL=null,mode=null,checkTimer=null,checking=false;
+const configFile=()=>path.join(app.getPath('userData'),'config.json');
+function loadConfig(){try{return JSON.parse(fs.readFileSync(configFile(),'utf8'))}catch{return {}}}
+function saveConfig(update){fs.mkdirSync(path.dirname(configFile()),{recursive:true});fs.writeFileSync(configFile(),JSON.stringify({...loadConfig(),...update},null,2))}
+function normalizeUrl(value){
+ try{const u=new URL(value);if(u.username||u.password||u.search||u.hash)return null;
+ if(u.protocol!=='https:'&&!(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname)))return null;
+ return u.origin}catch{return null}
 }
-const offlineHTML=`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;background:#202127;color:#f5f6fc;display:grid;place-items:center;text-align:center;font-family:system-ui,"Malgun Gothic",sans-serif}.globe{position:relative;margin:auto auto 25px;font-size:100px;line-height:1.2;color:#b6bbd1}.x{position:absolute;right:-12px;bottom:5px;font-size:51px;color:#fa6868;font-weight:900;text-shadow:0 1px 10px #0008}h1{font-size:36px;margin:0 0 12px}p{color:#aaaec3;font-size:16px;margin:0 0 28px}button{display:block;margin:12px auto 0;min-width:255px;padding:15px 20px;border:0;border-radius:10px;background:#5865f2;color:white;font-size:16px;font-weight:700;cursor:pointer}button.secondary{background:#37394a}small{display:block;color:#969bad;margin-top:28px}button:hover{filter:brightness(1.12)}</style><div><div class="globe" aria-label="인터넷 연결 없음">🌐<span class="x">✕</span></div><h1>와이파이가 없습니다.</h1><p>인터넷 연결을 확인한 후 다시 시도해 주세요.</p><button id="wifi">와이파이 설정하러 가기</button><button id="retry" class="secondary">다시 연결</button><small>Windows Wi-Fi 설정을 엽니다.</small></div><script>document.getElementById('wifi').onclick=()=>window.yeon.openWifi();document.getElementById('retry').onclick=()=>window.yeon.retry();<\/script></html>`;
-function showOffline(){if(!win||win.isDestroyed()||offline)return;offline=true;win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent(offlineHTML))}
-async function checkConnection(){
- if(!win||win.isDestroyed()||!serverUrl)return;
- if(!net.isOnline()){showOffline();return}
- try{const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),3500);
- const response=await net.fetch(serverUrl+'/api/health',{signal:controller.signal,cache:'no-store'}).finally(()=>clearTimeout(timeout));
- if(!response.ok)throw Error('서버에 연결할 수 없습니다.');
- if(offline||!loaded){offline=false;loaded=true;win.loadURL(serverUrl+'/')}
- }catch{showOffline()}
+const css=`*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#202127;color:#f6f6fc;font:16px system-ui,"Malgun Gothic",sans-serif}.panel{width:min(590px,92vw);text-align:center}h1{font-size:32px;margin:10px 0}p{color:#b8b9ca;line-height:1.6}button,input{font:inherit;border-radius:10px;padding:13px;border:0}button{background:#5865f2;color:white;font-weight:700;cursor:pointer;margin:6px;min-width:220px}button.secondary{background:#3e4050}input{width:100%;background:#12131a;border:1px solid #55596b;color:white;margin:10px 0}small{display:block;color:#aaaec1;margin:12px}#error{color:#ff9d9d}`;
+const html=(content)=>'data:text/html;charset=utf-8,'+encodeURIComponent('<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+css+'</style>'+content+'</html>');
+const selection=()=>html(`<div class="panel"><div style="font-size:48px">✦</div><h1>YEON 메신저</h1><p>연결할 채팅 서버를 선택하세요.</p><button id="local">내 컴퓨터에서 시작</button><button id="cloud" class="secondary">공용 서버에 접속</button><p>내 컴퓨터: 로컬 서버가 자동 실행됩니다.<br>공용 서버: 운영자가 제공한 서버 주소가 필요합니다.</p><section id="address" style="display:none"><input id="url" placeholder="https://your-server.example" aria-label="공용 서버 주소"><button id="connect">서버 연결</button><p id="error"></p></section></div><script>
+ document.getElementById('local').onclick=()=>window.yeon.chooseMode('local');
+ document.getElementById('cloud').onclick=()=>document.getElementById('address').style.display='block';
+ document.getElementById('connect').onclick=async()=>{const result=await window.yeon.chooseMode('cloud',document.getElementById('url').value.trim());if(result?.error)document.getElementById('error').textContent=result.error};
+<\/script>`);
+const offline=()=>html(`<div class="panel"><div style="font-size:100px">🌐<span style="color:#ff7171;margin-left:-35px">✕</span></div><h1>와이파이가 없습니다.</h1><p>인터넷 또는 채팅 서버에 연결할 수 없습니다.<br>공용 서버 주소와 연결 상태를 확인해 주세요.</p><button id="wifi">와이파이 설정하러 가기</button><button class="secondary" id="retry">다시 연결</button><button class="secondary" id="switch">서버 선택</button></div><script>document.getElementById('wifi').onclick=()=>window.yeon.openWifi();document.getElementById('retry').onclick=()=>window.yeon.retry();document.getElementById('switch').onclick=()=>window.yeon.showServers();<\/script>`);
+function showSelection(){mode=null;baseURL=null;clearInterval(checkTimer);win.loadURL(selection())}
+function showOffline(){if(win&&!win.isDestroyed()&&!win.webContents.getURL().startsWith('data:text/html'))win.loadURL(offline())}
+async function ensureLocal(){
+ if(localServer?.listening)return 'http://127.0.0.1:'+localServer.address().port;
+ if(!localServer){process.env.YEON_DATA_FILE=path.join(app.getPath('userData'),'local-chat-data.json');localServer=require('./server')}
+ if(!localServer.listening)await new Promise((resolve,reject)=>{localServer.once('error',reject);localServer.listen(0,'127.0.0.1',resolve)});
+ return 'http://127.0.0.1:'+localServer.address().port;
 }
-ipcMain.handle('open-wifi-settings',async()=>{if(process.platform==='win32')await shell.openExternal('ms-settings:network-wifi');else await shell.openExternal('https://support.microsoft.com/windows')});
-ipcMain.handle('retry-connection',()=>checkConnection());
+async function connect(choice,address){
+ if(choice==='local'){baseURL=await ensureLocal();mode='local';saveConfig({mode:'local'})}
+ else{
+ const url=normalizeUrl(address);if(!url)return {error:'올바른 HTTPS 서버 주소를 입력하세요.'};
+ baseURL=url;mode='cloud';saveConfig({mode:'cloud',serverUrl:url})
+ }
+ await check(true);clearInterval(checkTimer);checkTimer=setInterval(()=>check(false),10000);return {ok:true};
+}
+async function check(force=false){
+ if(!baseURL||checking||!win||win.isDestroyed())return;
+ checking=true;
+ try{
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),4000);
+  const response=await net.fetch(baseURL+'/api/health',{signal:controller.signal,cache:'no-store'}).finally(()=>clearTimeout(timeout));
+  if(!response.ok)throw Error('Server unavailable');
+  if(force||win.webContents.getURL().startsWith('data:text/html'))await win.loadURL(baseURL+'/');
+ }catch{showOffline();if(force)await win.loadURL(offline())}finally{checking=false}
+}
+ipcMain.handle('choose-mode',async(_e,choice,address)=>{try{return await connect(choice,address)}catch(e){return {error:e.message}}});
+ipcMain.handle('show-servers',()=>showSelection());
+ipcMain.handle('retry-connection',()=>check(true));
+ipcMain.handle('open-wifi-settings',()=>shell.openExternal(process.platform==='win32'?'ms-settings:network-wifi':'https://support.microsoft.com/windows'));
 app.whenReady().then(async()=>{
- serverUrl=await chooseServer();
- win=new BrowserWindow({width:1280,height:820,minWidth:760,minHeight:540,title:'YEON Messenger',backgroundColor:'#202127',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'preload.js')}});
- if(!serverUrl){win.loadURL('data:text/html;charset=utf-8,'+encodeURIComponent('<html lang="ko"><meta charset="utf-8"><body style="font:16px system-ui;background:#202127;color:white;padding:65px"><h1>✦ YEON 메신저</h1><p>채팅 서버 주소를 설정해 주세요.</p><p>%APPDATA%/YEON/config.json: {"serverUrl":"https://your-server.example"}</p></body></html>'));return}
+ win=new BrowserWindow({width:1280,height:820,minWidth:760,minHeight:540,title:'YEON Messenger',backgroundColor:'#202127',webPreferences:{contextIsolation:true,nodeIntegration:false,sandbox:true,preload:path.join(__dirname,'preload.js')}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
- win.webContents.on('will-navigate',(event,target)=>{if(!target.startsWith(serverUrl+'/')&&!target.startsWith('data:text/html'))event.preventDefault()});
- win.webContents.on('did-fail-load',(event,code,desc,url,isMainFrame)=>{if(isMainFrame&&url.startsWith(serverUrl))showOffline()});
- await checkConnection();timer=setInterval(checkConnection,6000);
+ win.webContents.on('will-navigate',(e,target)=>{if(!target.startsWith('data:text/html')&&!(baseURL&&target.startsWith(baseURL+'/')))e.preventDefault()});
+ win.webContents.on('did-fail-load',(_e,_code,_desc,url,isMainFrame)=>{if(isMainFrame&&baseURL&&url.startsWith(baseURL))showOffline()});
+ const config=loadConfig();if(config.mode==='local')await connect('local');else if(config.mode==='cloud'&&config.serverUrl)await connect('cloud',config.serverUrl);else showSelection();
 });
-app.on('before-quit',()=>{if(timer)clearInterval(timer)});
+app.on('before-quit',()=>{clearInterval(checkTimer);localServer?.close()});
 app.on('window-all-closed',()=>app.quit());
