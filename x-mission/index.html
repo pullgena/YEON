@@ -2,36 +2,121 @@
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YEON X Mission</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,'Malgun Gothic',sans-serif;color:#202124;background:white}.browser{height:100vh;display:flex;flex-direction:column;overflow:hidden}.titlebar{height:50px;flex-shrink:0;background:#f9ded5;display:flex;align-items:flex-end;padding-left:7px;gap:5px;user-select:none;-webkit-app-region:drag}.titlebar button,.titlebar .tab,.titlebar .gemini{-webkit-app-region:no-drag}.dropdown{align-self:center;width:36px;height:36px;border:0;border-radius:13px;background:#fcebe5;font-size:22px;cursor:pointer}.tab{height:42px;width:294px;max-width:36vw;border-radius:15px 15px 0 0;background:#fff5f2;display:flex;align-items:center;padding:0 12px;gap:10px;font-size:14px;white-space:nowrap}.chrome-logo{width:19px;height:19px;border-radius:50%;background:conic-gradient(#e64235 0 120deg,#fbbc05 120deg 205deg,#34a853 205deg 285deg,#4285f4 285deg 325deg,#e64235 325deg);position:relative;flex:none}.chrome-logo:after{content:'';position:absolute;inset:5px;border-radius:50%;background:#4285f4;border:2px solid white}.tab-title{flex:1}.icon-btn{border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:#242424;font-size:21px;flex:none}.tab-close{width:25px;height:26px;border-radius:50%;font-size:18px}.tab-close:hover{background:#e9d4cd}.plus{align-self:center;width:33px;height:34px;border-radius:50%}.plus:hover,.window-btn:hover{background:#edd0c7}.spacer{flex:1}.gemini{align-self:center;background:#fffaf8;border-radius:16px;padding:7px 12px;font-size:14px;white-space:nowrap;margin-right:5px}.sparkle{color:#4285f4}.separator{align-self:center;width:2px;height:20px;background:#ffb4a3;margin-right:8px}.window-btn{align-self:stretch;width:48px;height:50px;font-size:21px;border-radius:0}.window-btn.close:hover{background:#e81123;color:white}.toolbar{height:50px;flex-shrink:0;background:#fff5f2;display:flex;align-items:center;gap:16px;padding:0 14px}.nav{color:#9d9d9d;font-size:24px;width:29px;height:32px}.nav.reload{color:#414141}.omnibox{height:42px;min-width:0;border-radius:24px;background:#f1e9e9;flex:1;display:flex;align-items:center;gap:12px;padding:0 12px;font-size:16px;white-space:nowrap;overflow:hidden}.google{font-weight:bold;font-size:21px;flex:none;background:conic-gradient(#4285f4 0 95deg,#34a853 95deg 160deg,#fbbc05 160deg 225deg,#ea4335 225deg 300deg,#4285f4 300deg);background-clip:text;color:transparent}.placeholder{overflow:hidden;text-overflow:ellipsis}.profile{height:42px;border-radius:24px;background:#f9ded5;padding:0 12px;display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:13px}.avatar{width:23px;height:23px;border-radius:50%;background:#8472a9;color:white;display:grid;place-items:center}.menu{width:23px;font-size:22px}.page{flex:1;min-height:0;background:white;display:grid;place-items:center;text-align:center;padding:24px}.hint h1{font-size:clamp(25px,4vw,42px)}.hint p{color:#777;font-size:15px;line-height:1.7}.hint small{color:#999}.mission-screen{display:none;position:fixed;inset:0;background:#150307;color:white;z-index:10;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:25px;animation:flash .25s 5}.mission-screen.active{display:flex}.mission-screen h2{color:#ff4050;font-size:clamp(40px,8vw,90px);margin:12px 0;text-shadow:0 0 32px #e22347}.mission-screen p{font-size:clamp(17px,3vw,25px);line-height:1.7}.mission-screen .icon{font-size:68px;animation:shake .22s infinite}.mission-screen .later{color:#ffafb6}.mission-screen .note{font-size:14px;color:#9d8287;margin-top:20px}@keyframes shake{25%{transform:translate(-7px,3px)}75%{transform:translate(7px,-3px)}}@keyframes flash{from{background:#b40017}to{background:#150307}}@media(max-width:690px){.gemini,.separator,.profile{display:none}.tab{max-width:50vw}.window-btn{width:35px}.toolbar{gap:7px;padding:0 7px}.omnibox{font-size:13px}}
+.mission-screen{animation:none;background:radial-gradient(circle at center,#361322,#100910);overflow:auto}.mission-screen h2{font-size:clamp(32px,6vw,64px)}.mission-screen p{font-size:18px}.mission-panel{width:min(680px,100%);padding:32px 20px;max-height:100%;overflow:auto}.mission-label{color:#ff7e95;font-weight:700;letter-spacing:4px;font-size:12px}.game-button{background:#f33d62;color:#fff;border:0;padding:18px 38px;border-radius:17px;font-size:26px;font-weight:800;cursor:pointer;box-shadow:0 8px 0 #9d1234;touch-action:manipulation;user-select:none}.game-button:active{transform:translateY(5px);box-shadow:0 3px 0 #9d1234}.counter{font-size:28px!important;font-weight:800;font-variant-numeric:tabular-nums}.progress{height:16px;background:#4f2b38;border-radius:14px;overflow:hidden;margin-top:28px}.progress>div{height:100%;width:0%;background:linear-gradient(90deg,#ff5571,#ffd068);transition:width .1s}.arena{position:relative;width:min(520px,100%);height:240px;margin:18px auto;border:2px solid #a35a72;border-radius:18px;background:repeating-linear-gradient(90deg,#211b2b 0 38px,#281d2c 38px 40px);overflow:hidden;cursor:crosshair;touch-action:manipulation}.moving-target{position:absolute;top:90px;left:50%;transform:translate(-50%,-50%);font-size:48px;line-height:1;cursor:crosshair;user-select:none}.crosshair{pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;color:#d5b5c0;opacity:.4}.arrow-help{font-size:13px!important;color:#d0bdc7}.success-icon{font-size:65px}.mission-footer{font-size:12px;color:#99828e;margin-top:28px}.home-button{font-size:17px}.mission-screen [hidden]{display:none!important}#clickGame,#arrowGame,#completeGame{margin-top:18px}button:focus-visible{outline:3px solid #ffce5d;outline-offset:3px}
 </style></head><body>
-<div class="browser"><header class="titlebar"><button class="dropdown" aria-label="탭 검색">⌄</button><div class="tab"><span class="chrome-logo"></span><span class="tab-title">새 탭</span><button class="icon-btn tab-close" data-x aria-label="탭 닫기">×</button></div><button class="icon-btn plus" aria-label="새 탭">+</button><div class="spacer"></div><div class="gemini"><span class="sparkle">✦</span> Gemini에게 물어보기</div><div class="separator"></div><button class="icon-btn window-btn" id="minimize-window" title="최소화">−</button><button class="icon-btn window-btn" id="maximize-window" title="최대화">▢</button><button class="icon-btn window-btn close" data-x aria-label="창 닫기">×</button></header>
+<div class="browser"><header class="titlebar"><button class="dropdown" aria-label="탭 검색">⌄</button><div class="tab"><span class="chrome-logo"></span><span class="tab-title">새 탭</span><button class="icon-btn tab-close" data-x aria-label="탭 닫기">×</button></div><button class="icon-btn plus" aria-label="새 탭">+</button><div class="spacer"></div><div class="gemini"><span class="sparkle">✦</span> Gemini에게 물어보기</div><div class="separator"></div><button class="icon-btn window-btn" id="minimize-window" title="최소화">−</button><button class="icon-btn window-btn" id="maximize-window" title="최대화">▢</button><button class="icon-btn window-btn close" id="close-window" aria-label="창 닫기">×</button></header>
 <div class="toolbar"><button class="icon-btn nav" title="뒤로">‹</button><button class="icon-btn nav" title="앞으로">›</button><button class="icon-btn nav reload" id="refresh" title="새로고침">⟳</button><div class="omnibox"><span class="google">G</span><span class="placeholder">Google에 물어보거나 URL을 입력하세요.</span></div><div class="profile"><span class="avatar">♙</span> 본인 인증</div><button class="icon-btn menu" title="더보기">⋮</button></div>
-<main class="page"><section class="hint"><h1>새 탭</h1><p>오른쪽 위 X 또는 탭의 X를 눌러 보세요.<br>미션은 나중에 업데이트됩니다.</p><small>이 화면은 크롬 스타일을 참고해 만든 YEON 앱입니다.</small></section></main></div>
-<div class="mission-screen" id="mission" role="dialog" aria-modal="true" aria-labelledby="missionHeading"><div class="icon">🚨</div><h2 id="missionHeading">미션 시작!</h2><p>X 버튼을 누르셨군요.<br><span class="later">미션 내용은 추후 업데이트 예정입니다.</span></p><div class="note">경고음은 약 3초 후 자동으로 종료됩니다.</div></div>
+<main class="page"><section class="hint"><h1>새 탭</h1><p>탭의 X를 누르면 랜덤 미션이 시작됩니다.<br>맨 위 창 X를 누르면 앱이 종료됩니다.</p><small>이 화면은 크롬 스타일을 참고해 만든 YEON 앱입니다.</small></section></main></div>
+<div class="mission-screen" id="mission" role="dialog" aria-modal="true" aria-labelledby="missionHeading">
+  <div class="mission-panel">
+    <div class="mission-label">YEON · RANDOM MISSION</div>
+    <h2 id="missionHeading">미션 시작!</h2>
+    <p id="missionDesc">준비하세요!</p>
+    <div id="clickGame" hidden>
+      <div class="progress"><div id="progressFill"></div></div>
+      <p class="counter"><span id="clickCount">0</span> / <span id="clickGoal">300</span></p>
+      <button id="clickTarget" class="game-button">CLICK!</button>
+    </div>
+    <div id="arrowGame" hidden>
+      <p class="counter">명중 <span id="hitCount">0</span> / 5</p>
+      <div id="arena" class="arena"><div id="movingTarget" class="moving-target">🎯</div><div class="crosshair">＋</div></div>
+      <p class="arrow-help">움직이는 과녁을 직접 클릭하거나, 마우스로 조준한 후 스페이스바를 누르세요.</p>
+    </div>
+    <div id="completeGame" hidden>
+      <div class="success-icon">🏆</div><h3>미션 성공!</h3>
+      <button id="goHome" class="game-button home-button">처음 화면으로</button>
+    </div>
+    <div class="mission-footer">창을 닫으려면 맨 위 오른쪽 X를 누르세요.</div>
+  </div>
+</div>
 <script>
 'use strict';
-let audio=null;
+let audio=null,missionType=null,goal=0,clicks=0,hits=0,animationId=0,startedAt=0;
+const $=id=>document.getElementById(id);
 function playAlarm(){
- const AudioAPI=window.AudioContext||window.webkitAudioContext;if(!AudioAPI)return;
- if(!audio)audio=new AudioAPI();void audio.resume();
- const start=audio.currentTime;
- const master=audio.createGain();master.gain.value=1;
- const limiter=audio.createDynamicsCompressor();limiter.threshold.value=-12;limiter.ratio.value=16;limiter.attack.value=.002;limiter.release.value=.09;
- master.connect(limiter);limiter.connect(audio.destination);
+ const API=window.AudioContext||window.webkitAudioContext;
+ if(!API)return;
+ if(!audio)audio=new API();
+ void audio.resume();
+ const now=audio.currentTime;
+ const master=audio.createGain();master.gain.value=.65;
+ const compressor=audio.createDynamicsCompressor();compressor.threshold.value=-14;compressor.ratio.value=12;
+ master.connect(compressor);compressor.connect(audio.destination);
  for(let i=0;i<2;i++){
-  const osc=audio.createOscillator();const gain=audio.createGain();osc.type=i?'sawtooth':'square';gain.gain.value=i?.28:.45;
-  osc.connect(gain);gain.connect(master);
-  for(let j=0;j<18;j++)osc.frequency.setValueAtTime((j%2?920:580)+i*145,start+j*.16);
-  osc.start(start);osc.stop(start+3);
+  const oscillator=audio.createOscillator(),volume=audio.createGain();
+  oscillator.type=i?'sawtooth':'square';volume.gain.value=i?.23:.42;
+  oscillator.connect(volume);volume.connect(master);
+  for(let n=0;n<18;n++)oscillator.frequency.setValueAtTime((n%2?950:630)+i*120,now+n*.16);
+  oscillator.start(now);oscillator.stop(now+2.9);
  }
- setTimeout(()=>{try{master.disconnect();limiter.disconnect()}catch{}},3200);
+ setTimeout(()=>{try{master.disconnect();compressor.disconnect()}catch{}},3100);
 }
-function openMission(){document.getElementById('mission').classList.add('active');try{playAlarm()}catch(err){console.error(err)}}
-document.querySelectorAll('[data-x]').forEach(button=>button.addEventListener('click',openMission));
-document.getElementById('refresh').addEventListener('click',()=>location.reload());
+function chooseClickGoal(){
+ const r=Math.random()*100;
+ // 60% 300, 20% 900, 10% 2000, remaining 10% 100.
+ return r<60?300:r<80?900:r<90?2000:100;
+}
+function stopAnimation(){cancelAnimationFrame(animationId);animationId=0}
+function openMission(){
+ stopAnimation();$('mission').classList.add('active');
+ $('completeGame').hidden=true;clicks=0;hits=0;
+ missionType=Math.random()<.5?'click':'arrow';
+ $('clickGame').hidden=missionType!=='click';
+ $('arrowGame').hidden=missionType!=='arrow';
+ $('missionHeading').textContent=missionType==='click'?'클릭 챌린지':'화살 명중시키기';
+ if(missionType==='click'){
+   goal=chooseClickGoal();$('clickGoal').textContent=goal;
+   $('clickCount').textContent='0';$('progressFill').style.width='0%';
+   $('missionDesc').textContent='버튼을 '+goal+'번 클릭하세요!';
+ }else{
+   $('hitCount').textContent='0';$('missionDesc').textContent='움직이는 과녁을 5번 맞히세요!';
+   startedAt=performance.now();animationId=requestAnimationFrame(moveTarget);
+ }
+ try{playAlarm()}catch(error){console.error(error)}
+}
+function completeMission(){
+ stopAnimation();$('clickGame').hidden=true;$('arrowGame').hidden=true;
+ $('completeGame').hidden=false;$('missionHeading').textContent='성공!';
+ $('missionDesc').textContent='미션을 완료했습니다.';
+}
+function countClick(){
+ if(missionType!=='click'||$('clickGame').hidden)return;
+ clicks++;$('clickCount').textContent=clicks;
+ $('progressFill').style.width=(clicks/goal*100)+'%';
+ if(clicks>=goal)completeMission();
+}
+function moveTarget(now){
+ if($('arrowGame').hidden)return;
+ const arena=$('arena'),target=$('movingTarget');
+ const t=(now-startedAt)/1000;
+ const usableW=Math.max(0,arena.clientWidth-64),usableH=Math.max(0,arena.clientHeight-64);
+ target.style.left=(32+usableW*(.5+.45*Math.sin(t*1.83)))+'px';
+ target.style.top=(32+usableH*(.5+.42*Math.sin(t*2.47+1)))+'px';
+ animationId=requestAnimationFrame(moveTarget);
+}
+function shootArrow(x,y){
+ if(missionType!=='arrow'||$('arrowGame').hidden)return;
+ const b=$('movingTarget').getBoundingClientRect();
+ const cx=b.left+b.width/2,cy=b.top+b.height/2;
+ if(Math.hypot(x-cx,y-cy)<=Math.max(24,b.width*.5)){
+  hits++;$('hitCount').textContent=hits;
+  if(hits>=5)completeMission();
+ }
+}
+$('clickTarget').addEventListener('click',countClick);
+$('arena').addEventListener('click',e=>shootArrow(e.clientX,e.clientY));
+document.addEventListener('keydown',e=>{
+ if($('mission').classList.contains('active')&&!$('arrowGame').hidden&&e.code==='Space'){
+  e.preventDefault();const r=$('arena').getBoundingClientRect();shootArrow(r.left+r.width/2,r.top+r.height/2);
+ }
+});
+$('goHome').addEventListener('click',()=>{stopAnimation();$('mission').classList.remove('active');missionType=null});
+document.querySelectorAll('.tab-close').forEach(button=>button.addEventListener('click',openMission));
+$('close-window').addEventListener('click',()=>{if(window.yeonDesktop)window.yeonDesktop.close();else window.close()});
+$('refresh').addEventListener('click',()=>location.reload());
 if(window.yeonDesktop){
- document.getElementById('minimize-window').addEventListener('click',()=>window.yeonDesktop.minimize());
- document.getElementById('maximize-window').addEventListener('click',()=>window.yeonDesktop.maximize());
+ $('minimize-window').addEventListener('click',()=>window.yeonDesktop.minimize());
+ $('maximize-window').addEventListener('click',()=>window.yeonDesktop.maximize());
  window.yeonDesktop.onMission(openMission);
 }
-window.addEventListener('beforeunload',e=>{if(!document.getElementById('mission').classList.contains('active'))return;e.preventDefault();e.returnValue=''});
 </script></body></html>
