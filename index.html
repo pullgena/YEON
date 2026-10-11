@@ -6,9 +6,12 @@
 dialog{background:#30313c;border:1px solid #555869;color:white;border-radius:13px;padding:25px;width:min(420px,92vw)}dialog::backdrop{background:#000b}dialog input{background:#171820;border:1px solid #555;color:white;padding:11px;width:100%;margin:12px 0}dialog button{padding:10px 15px;border-radius:7px;background:#5865f2}dialog button.cancel{background:#555}#notice{position:fixed;bottom:75px;left:50%;transform:translateX(-50%);background:#14151c;padding:12px;border-radius:9px;display:none}
 @media(max-width:900px){#app{grid-template-columns:65px 210px minmax(0,1fr)}.members{display:none}}@media(max-width:610px){#app{grid-template-columns:56px 120px minmax(0,1fr)}.heading{padding:12px;font-size:13px}.stream{padding:10px}.composer{margin:6px}.nav{padding:8px 4px;font-size:12px}}
 </style></head><body>
-<section id="auth"><div class="authbox"><h1>✦ YEON</h1><p>친구와 연결되는 나만의 메신저</p><input id="username" placeholder="사용자 이름 (2~24자)" autocomplete="username"><input id="password" type="password" placeholder="비밀번호 (8자 이상)" autocomplete="current-password"><p id="authError" class="err"></p><button class="primary" id="login">로그인</button><button class="secondary" id="register">계정 만들기</button></div></section>
+<section id="auth"><div class="authbox"><h1>✦ YEON</h1><p id="authCaption">로그인하거나 새 계정을 만드세요.</p>
+<div id="loginStage"><input id="username" placeholder="사용자 이름" autocomplete="username"><input id="password" type="password" placeholder="비밀번호" autocomplete="current-password"><button class="primary" id="login">로그인</button><button class="secondary" id="register">계정 만들기</button></div>
+<div id="signupStage" class="hidden"><input id="newName" placeholder="새 사용자 이름 (2~24자)" autocomplete="username"><input id="newEmail" type="email" placeholder="본인 이메일 주소" autocomplete="email"><input id="newPassword" type="password" placeholder="비밀번호 (8자 이상)" autocomplete="new-password"><button class="primary" id="sendCode">이메일 인증번호 받기</button><button class="secondary" id="signupBack">로그인으로 돌아가기</button></div>
+<div id="verifyStage" class="hidden"><p id="verifyEmail"></p><input id="emailCode" inputmode="numeric" maxlength="6" placeholder="이메일 인증번호 6자리"><button class="primary" id="verifyCode">인증하고 메인 화면으로</button><button class="secondary" id="verifyBack">이메일 다시 입력</button></div><p id="authError" class="err" role="alert"></p></div></section>
 <div id="app" class="hidden"><nav class="rail"><button class="bubble" id="home" title="친구">✦</button><div id="serverIcons" style="display:contents"></div><button class="bubble add" id="addServer" title="서버 만들기">＋</button><button class="bubble add" id="joinServer" title="서버 참가">➜</button></nav>
-<aside class="side"><div class="heading" id="serverTitle">친구</div><div class="sidecontent" id="sidebar"></div><div class="profile"><b id="me"></b><button id="logout">로그아웃</button></div></aside>
+<aside class="side"><div class="heading" id="serverTitle">홈 · 친구</div><div class="sidecontent" id="sidebar"></div><div class="profile"><b id="me"></b><button id="logout">로그아웃</button></div></aside>
 <main class="main"><div class="top" id="roomTitle">친구</div><div class="stream" id="stream"></div><form class="composer" id="form"><textarea id="text" rows="2" maxlength="2000" placeholder="메시지 보내기 (Enter)"></textarea><button type="submit">전송</button></form></main>
 <aside class="members"><h3>YEON</h3><div>친구와 서버에 참여해 대화해 보세요.</div><p id="network"></p></aside></div>
 <dialog id="dialog"><form id="dialogForm"><h2 id="dialogTitle"></h2><p id="dialogDescription"></p><input id="dialogValue" required><div style="display:flex;justify-content:flex-end;gap:8px"><button class="cancel" type="button" id="cancel">취소</button><button type="submit">확인</button></div></form></dialog><div id="notice"></div>
@@ -23,20 +26,26 @@ $('dialogForm').onsubmit=e=>{e.preventDefault();$('dialog').close();modalResolve
 function dmRoom(other){return 'dm:'+([state.me.id,other].sort().join(':'))}
 function friends(){return state.friends.filter(f=>f.status==='accepted').map(f=>f.from===state.me.id?f.to:f.from)}
 function userName(id){return id===state.me.id?state.me.name:(state.users.find(u=>u.id===id)?.name||'사용자')}
-async function doAuth(route){try{const result=await api('/api/'+route,{name:$('username').value.trim(),password:$('password').value});token=result.token;localStorage.setItem('yeon-token',token);await start()}catch(e){$('authError').textContent=e.message}}
-$('login').onclick=()=>doAuth('login');$('register').onclick=()=>doAuth('register');$('password').onkeydown=e=>{if(e.key==='Enter')doAuth('login')};
+function authStage(stage){for(const id of ['loginStage','signupStage','verifyStage'])$(id).classList.toggle('hidden',id!==stage);$('authError').textContent='';$('authCaption').textContent=stage==='loginStage'?'로그인하거나 새 계정을 만드세요.':stage==='signupStage'?'이메일 인증으로 YEON 계정을 만들어 주세요.':'이메일로 받은 6자리 인증번호를 입력하세요.'}
+async function doLogin(){try{const result=await api('/api/login',{name:$('username').value.trim(),password:$('password').value});token=result.token;localStorage.setItem('yeon-token',token);await start()}catch(e){$('authError').textContent=e.message}}
+$('login').onclick=doLogin;$('password').onkeydown=e=>{if(e.key==='Enter')doLogin()};
+$('register').onclick=()=>authStage('signupStage');$('signupBack').onclick=()=>authStage('loginStage');
+$('sendCode').onclick=async()=>{const button=$('sendCode');button.disabled=true;try{const email=$('newEmail').value.trim();await api('/api/register/start',{name:$('newName').value.trim(),email,password:$('newPassword').value});$('verifyEmail').textContent=email+' 주소로 전송한 인증번호를 입력해 주세요.';authStage('verifyStage');$('emailCode').focus()}catch(e){$('authError').textContent=e.message}finally{button.disabled=false}};
+$('verifyBack').onclick=()=>authStage('signupStage');
+$('verifyCode').onclick=async()=>{const button=$('verifyCode');button.disabled=true;try{const result=await api('/api/register/verify',{email:$('newEmail').value.trim(),code:$('emailCode').value.trim()});token=result.token;localStorage.setItem('yeon-token',token);await start()}catch(e){$('authError').textContent=e.message}finally{button.disabled=false}};
+$('emailCode').onkeydown=e=>{if(e.key==='Enter')$('verifyCode').click()};
 async function reload(){state=await api('/api/state');if(!home&&!state.servers.some(s=>s.id===serverId)){home=true;serverId=null;room=null}render()}
 function render(){
  $('me').textContent=state.me.name;$('auth').classList.add('hidden');$('app').classList.remove('hidden');
  $('home').classList.toggle('on',home);$('serverIcons').replaceChildren();
  state.servers.forEach(s=>{let b=node('button',s.name.slice(0,1).toUpperCase(),'bubble'+(!home&&s.id===serverId?' on':''));b.title=s.name;b.onclick=()=>{home=false;serverId=s.id;room=state.channels.find(c=>c.serverId===s.id)?.id||null;render()};$('serverIcons').append(b)});
- $('serverTitle').textContent=home?'친구':state.servers.find(s=>s.id===serverId)?.name||'서버';$('sidebar').replaceChildren();
- if(home){const heading=node('div','친구 관리','group'),add=node('button','＋');add.onclick=addFriend;heading.append(add);$('sidebar').append(heading);
+ $('serverTitle').textContent=home?'홈 · 친구':state.servers.find(s=>s.id===serverId)?.name||'서버';$('sidebar').replaceChildren();
+ if(home){const heading=node('div','친구 추가 · 관리','group'),add=node('button','＋');add.onclick=addFriend;heading.append(add);$('sidebar').append(heading);
  const pending=state.friends.filter(f=>f.status==='pending'&&f.to===state.me.id);
  pending.forEach(f=>{let b=node('button','수락: '+userName(f.from),'nav');b.onclick=async()=>{await api('/api/friend/accept',{id:f.id});await reload()};$('sidebar').append(b)});
  friends().forEach(id=>{const b=node('button','◉ '+userName(id),'nav'+(room===dmRoom(id)?' on':''));b.onclick=()=>{room=dmRoom(id);render()};$('sidebar').append(b)});
  if(!friends().length)$('sidebar').append(node('div','친구 추가 버튼을 눌러 친구를 찾아보세요.','intro'));
- }else{const header=node('div','텍스트 채널','group'),plus=node('button','＋');plus.onclick=addChannel;header.append(plus);$('sidebar').append(header);
+ }else{const header=node('div','채팅방 추가 · 채널','group'),plus=node('button','＋');plus.onclick=addChannel;header.append(plus);$('sidebar').append(header);
  state.channels.filter(c=>c.serverId===serverId).forEach(c=>{const b=node('button','# '+c.name,'nav'+(room===c.id?' on':''));b.onclick=()=>{room=c.id;render()};$('sidebar').append(b)});
  const s=state.servers.find(s=>s.id===serverId);const code=node('button','초대 코드: '+(s?.invite||''),'nav');code.onclick=()=>{navigator.clipboard?.writeText(s.invite).then(()=>notify('초대 코드를 복사했습니다.')).catch(()=>notify('초대 코드: '+s.invite))};$('sidebar').append(code)}
  draw();
