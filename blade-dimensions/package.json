@@ -6,10 +6,7 @@
   "author": "YEON",
   "license": "MIT",
   "scripts": {
-    "assemble": "node assemble-game.js",
-    "prestart": "npm run assemble",
     "start": "electron .",
-    "predist:win": "npm run assemble",
     "dist:win": "electron-builder --win nsis --x64"
   },
   "devDependencies": {
