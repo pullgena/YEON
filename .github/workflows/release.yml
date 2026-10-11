@@ -1,49 +1,59 @@
 name: Build Windows EXE
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
+
 jobs:
   windows-exe:
     runs-on: windows-latest
+    timeout-minutes: 35
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install
-        run: npm install --no-audit --no-fund
-      - name: Build EXE
+      - name: Verify build configuration
         shell: pwsh
+        run: |
+          node --version
+          npm --version
+          node -e "const p=require('./package.json'); if (!p.scripts?.dist || !p.build?.win) process.exit(1); console.log('Building YEON',p.version)"
+          if (!(Test-Path 'electron-main.js')) { throw 'electron-main.js is missing' }
+          if (!(Test-Path 'preload.js')) { throw 'preload.js is missing' }
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Windows installers
         run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - name: Upload EXE as workflow artifact
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: 'false'
+      - name: Verify EXE outputs
+        shell: pwsh
+        run: |
+          $files = @(Get-ChildItem -Path dist -Filter '*.exe' -File)
+          $files | Select-Object Name,Length | Format-Table
+          if ($files.Count -lt 2) { throw "Expected installer and portable EXE. Found $($files.Count)." }
+      - name: Upload Windows binaries as workflow artifacts
         uses: actions/upload-artifact@v4
         with:
           name: YEON-Windows-EXE
           path: dist/*.exe
           if-no-files-found: error
-      - name: Create release and attach EXE
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $tag = 'v' + (Get-Content package.json -Raw | ConvertFrom-Json).version
-          gh release view $tag --repo "${{ github.repository }}" *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "YEON $tag Windows" --notes "YEON Windows 64-bit installer and portable EXE."
-            if ($LASTEXITCODE -ne 0) { throw 'Failed to create release' }
-          }
-          $exeFiles = Get-ChildItem dist -Filter *.exe
-          if ($exeFiles.Count -eq 0) { throw 'No EXE was built' }
-          foreach ($exe in $exeFiles) {
-            gh release upload $tag $exe.FullName --repo "${{ github.repository }}" --clobber
-            if ($LASTEXITCODE -ne 0) { throw "Failed to upload $($exe.Name)" }
-          }
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.4.1
+          name: YEON v0.4.1 - Windows
+          target_commitish: ${{ github.sha }}
+          body: |
+            Windows용 YEON 채팅 앱 빌드입니다.
+            현재 공용 채팅 서버는 별도로 배포해야 하며 앱에 서버 URL 설정이 필요합니다.
+            인터넷 연결에 실패하면 Wi-Fi 설정 안내 화면이 나타납니다.
+          files: dist/*.exe
+          fail_on_unmatched_files: true
+          overwrite_files: true
