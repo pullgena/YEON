@@ -1,0 +1,55 @@
+name: Blade Dimensions Windows Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "blade-dimensions/**"
+      - ".github/workflows/blade-dimensions-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: blade-dimensions
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: "blade-dimensions/package.json"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows EXE
+        run: npm run dist:win
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: blade-dimensions-v0.2.0
+          name: Blade Dimensions v0.2.0
+          body: |
+            Blade Dimensions Windows 앱 릴리스입니다.
+
+            - Electron Windows 앱 (.exe)
+            - 존재했던 방이 사라지면 방장 퇴장 시간 안내
+            - 존재 기록이 없는 방 코드는 흰 화면에서 캐릭터가 "방이 없어요"라고 안내
+            - F3 디버그 화면
+            - 최대 FPS 설정
+            - 자연 복원 미션 / 엔딩 크레딧
+          files: |
+            blade-dimensions/dist/*.exe
+          fail_on_unmatched_files: true
+          make_latest: true
