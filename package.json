@@ -1,15 +1,16 @@
 {
   "name": "yeon-chat",
   "productName": "YEON",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "YEON desktop community chat",
+  "description": "YEON independent client-server messaging app",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
     "web": "node server.js",
     "dev": "electron .",
-    "dist": "electron-builder --win nsis portable"
+    "dist": "electron-builder --win nsis portable",
+    "server": "node server.js"
   },
   "devDependencies": {
     "electron": "^38.0.0",
@@ -21,8 +22,6 @@
     "asar": true,
     "files": [
       "electron-main.js",
-      "server.js",
-      "index.html",
       "package.json"
     ],
     "directories": {
