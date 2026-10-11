@@ -1,0 +1,49 @@
+{
+  "name": "blade-dimensions",
+  "version": "0.2.0",
+  "description": "Blade Dimensions multiplayer 3D action game",
+  "main": "main.js",
+  "author": "YEON",
+  "license": "MIT",
+  "scripts": {
+    "assemble": "node assemble-game.js",
+    "prestart": "npm run assemble",
+    "start": "electron .",
+    "predist:win": "npm run assemble",
+    "dist:win": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.yeon.bladedimensions",
+    "productName": "Blade Dimensions",
+    "files": [
+      "game.html",
+      "main.js",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Blade Dimensions"
+    },
+    "artifactName": "Blade-Dimensions-Setup-${version}-${arch}.${ext}"
+  }
+}
