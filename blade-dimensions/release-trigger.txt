@@ -1,1 +1,1 @@
-v0.2.2 weak-wifi-warning build trigger
+v0.2.3 settings-wifi-button build trigger
