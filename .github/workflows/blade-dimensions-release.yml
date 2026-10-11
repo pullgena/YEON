@@ -35,17 +35,17 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: blade-dimensions-v0.2.2
-          name: Blade Dimensions v0.2.2
+          tag_name: blade-dimensions-v0.2.3
+          name: Blade Dimensions v0.2.3
           body: |
-            Blade Dimensions Windows 앱 v0.2.2입니다.
+            Blade Dimensions Windows 앱 v0.2.3입니다.
 
-            - 인터넷은 연결되어 있지만 느리거나 불안정하면 상단 경고 표시
-            - 🌐 + 낮은 신호 막대 + "와이파이가 안좋습니다."
-            - 현재 측정 지연시간(ms) 표시
-            - 2회 연속 상태가 나쁠 때 경고 표시
-            - 2회 연속 상태가 좋아지면 자동 해제
-            - 완전 오프라인이면 기존 "와이파이가 없어요" 검은 화면 우선
+            - 게임 설정 화면에 📶 Wi-Fi 설정 항목 추가
+            - Wi-Fi 설정 열기 버튼으로 Windows 빠른 설정 바로 열기
+            - Wi-Fi 관리 항목 자동 진입 시도
+            - 자동 진입 실패 시 Windows Wi-Fi 설정 페이지 직접 열기
+            - 게임을 종료하지 않고 Wi-Fi 연결 상태 테스트 가능
+            - 기존 오프라인/약한 Wi-Fi 경고 기능 포함
           files: |
             blade-dimensions/dist/*.exe
           fail_on_unmatched_files: true
