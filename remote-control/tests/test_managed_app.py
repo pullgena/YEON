@@ -95,16 +95,12 @@ class BackgroundBehaviorTests(unittest.TestCase):
         self.assertIn('공유 중지',app.tray.title)
         self.assertNotEqual(active_icon,app.tray.icon.tobytes())
 
-    def test_local_toggle_controls_remote_authority_and_tray(self):
-        app=self.prepare()
-        self.assertFalse(app.server.state.can_remote_control())
-        app.toggle_remote_control()
-        self.assertTrue(app.server.state.can_remote_control())
-        self.assertIn('ON', app.tray.title)
-        self.assertIn('OFF로 변경', app.control_btn.settings['text'])
-        app.toggle_remote_control()
-        self.assertFalse(app.server.state.can_remote_control())
-        self.assertIn('OFF', app.tray.title)
+    def test_managed_pc_has_no_control_toggle(self):
+        app = self.prepare()
+        self.assertFalse(hasattr(app, 'toggle_remote_control'))
+        app._refresh_tray()
+        self.assertNotIn('원격 제어 ON', app.tray.title)
+        self.assertNotIn('원격 제어 OFF', app.tray.title)
 
     def test_full_quit_revokes_sessions(self):
         app = self.prepare()

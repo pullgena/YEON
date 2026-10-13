@@ -20,6 +20,12 @@ function emitStatus() {
 function setStatus(value) {status = value; emitStatus();}
 
 function closeRemote() {
+  if (currentAddress) {
+    const address = currentAddress;
+    void cookieForSession(session.defaultSession, address)
+      .then(cookie => send(address, '/api/control', {cookie, bytes:Buffer.from('{"enabled":false}')}))
+      .catch(() => {});
+  }
   if (focusSender) void focusSender.stop();
   if (remote && !remote.isDestroyed()) remote.close();
   remote = null;
@@ -83,7 +89,7 @@ function openController(address) {
 function createDashboard() {
   dashboard = new BrowserWindow({
     width: 720, height: 700, minWidth: 590, minHeight: 580,
-    title: 'YEON 원격 조정 - 관리자 v1.3.1',
+    title: 'YEON 원격 조정 - 관리자 v1.3.2',
     backgroundColor: '#0b1020',
     autoHideMenuBar: true,
     webPreferences: {
@@ -127,6 +133,19 @@ app.whenReady().then(() => {
       return {ok:true, enabled:info.remoteControlEnabled === true};
     } catch { return {ok:false}; }
   });
+  ipcMain.handle('yeon-admin:control-set', async (event, enabled) => {
+    if (event.sender !== dashboard?.webContents || !currentAddress)
+      return {ok:false, error:'먼저 관리 대상 PC에 연결하세요.'};
+    if (typeof enabled !== 'boolean') return {ok:false, error:'ON/OFF 값을 확인하세요.'};
+    try {
+      const cookie = await cookieForSession(session.defaultSession, currentAddress);
+      const info = await send(currentAddress, '/api/control', {
+        cookie, bytes:Buffer.from(JSON.stringify({enabled}))
+      });
+      setStatus(enabled ? '원격 제어 ON · 마우스와 키보드 조작 가능' : '원격 제어 OFF · 화면만 보기');
+      return {ok:true, enabled: info.remoteControlEnabled === true};
+    } catch (error) { return {ok:false, error:error.message}; }
+  });
   ipcMain.handle('yeon-admin:remote-mode', async event => {
     if (event.sender !== dashboard?.webContents) return {ok:false};
     if (!currentAddress) return {ok:false,error:'관리 대상 PC에 먼저 연결하세요.'};
@@ -134,10 +153,10 @@ app.whenReady().then(() => {
     try {
       const cookie = await cookieForSession(session.defaultSession, currentAddress);
       const info = await send(currentAddress, '/api/status', {method:'GET', cookie});
-      if (!info.remoteControlEnabled) return {ok:false,error:'관리 대상 PC에서 원격 제어가 OFF입니다. 관리 대상에서 ON으로 변경하세요.'};
+      if (!info.remoteControlEnabled) return {ok:false,error:'원격 제어가 OFF입니다. 관리자 제어판에서 ON을 누르세요.'};
     } catch (error) { return {ok:false,error:error.message}; }
     if (remote && !remote.isDestroyed()) {remote.show();remote.focus();}
-    setStatus('원격 제어 ON · 관리 대상 PC에서 허용함');
+    setStatus('원격 제어 ON · 관리자에서 허용함');
     return {ok:true};
   });
   ipcMain.handle('yeon-admin:connect', (_event, address) => {

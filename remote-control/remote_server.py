@@ -36,29 +36,37 @@ class ShareState:
         self.lock = threading.RLock()
         self.active = True
         self.focus = FocusSession()
-        self.remote_control_enabled = False  # local-only permission; reset on every share
+        # Each authenticated administrator session starts in screen-only mode.
+        self.remote_permissions: dict[str, bool] = {}
 
-    def can_remote_control(self) -> bool:
+    def can_remote_control(self, token: str | None) -> bool:
         with self.lock:
-            return self.active and self.remote_control_enabled
+            return self.active and bool(token) and self.authenticated(token) and self.remote_permissions.get(token, False)
 
-    def set_remote_control(self, enabled: bool) -> bool:
-        """Only the managed-PC GUI/tray calls this. Never expose a network toggle."""
+    def set_remote_control(self, token: str | None, enabled: bool) -> bool:
+        """Switch only this signed-in controller's input capability (not screen sharing)."""
         with self.lock:
-            self.remote_control_enabled = bool(enabled) and self.active
-            if not self.remote_control_enabled:
+            if not self.authenticated(token):
+                return False
+            self.remote_permissions[token] = enabled
+            if not enabled:
                 release = getattr(self.controller, 'release_all', None)
                 if callable(release):
                     release()
-            return self.remote_control_enabled
+            return enabled
 
-    def perform_if_allowed(self, data: dict) -> bool:
-        # Hold the same lock during input, so an OFF click cannot race an action.
+    def perform_if_allowed(self, token: str | None, data: dict) -> bool:
+        # The action and OFF toggle are serialized on the same lock.
         with self.lock:
-            if not self.active or not self.remote_control_enabled:
+            if not self.can_remote_control(token):
                 return False
             self.controller.perform(data)
             return True
+
+    def enabled_sessions(self) -> int:
+        with self.lock:
+            return sum(1 for token, enabled in list(self.remote_permissions.items())
+                       if enabled and self.authenticated(token))
 
     def authenticate(self, address: str, pin: str) -> str | None:
         now = time.monotonic()
@@ -73,6 +81,7 @@ class ShareState:
                 return None
             token = secrets.token_urlsafe(32)
             self.sessions[token] = now + PIN_TTL_SECONDS
+            self.remote_permissions[token] = False
             attempts.clear()
             return token
 
@@ -86,6 +95,9 @@ class ShareState:
             expiry = self.sessions.get(token)
             if expiry is None or expiry < now:
                 self.sessions.pop(token, None)
+                if self.remote_permissions.pop(token, False):
+                    release = getattr(self.controller, 'release_all', None)
+                    if callable(release): release()
                 return False
             return True
 
@@ -93,13 +105,17 @@ class ShareState:
         if token:
             with self.lock:
                 self.sessions.pop(token, None)
+                enabled = self.remote_permissions.pop(token, False)
+                if enabled:
+                    release = getattr(self.controller, 'release_all', None)
+                    if callable(release): release()
             if self.focus.owner == token:
                 self.focus.stop()
 
     def end(self) -> None:
         with self.lock:
             self.active = False
-            self.remote_control_enabled = False
+            self.remote_permissions.clear()
             self.sessions.clear()
             release = getattr(self.controller, 'release_all', None)
             if callable(release):
@@ -112,6 +128,9 @@ class ShareState:
             for token, expiry in list(self.sessions.items()):
                 if expiry < now:
                     self.sessions.pop(token, None)
+                    if self.remote_permissions.pop(token, False):
+                        release = getattr(self.controller, 'release_all', None)
+                        if callable(release): release()
             return len(self.sessions)
 
 
@@ -132,7 +151,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.1"
+    server_version = "YEONManaged/1.3.2"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -202,7 +221,7 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 return
             try:
                 w, h = self.server.state.controller.screen_size()
-                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h, "remoteControlEnabled": self.server.state.can_remote_control()})
+                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h, "remoteControlEnabled": self.server.state.can_remote_control(self._token())})
             except Exception:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "화면 크기를 읽을 수 없습니다."})
         elif path == "/api/focus/status":
@@ -295,6 +314,12 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.FORBIDDEN, {"error": "전송 중인 관리자만 종료할 수 있습니다."})
                 return
             self._json(HTTPStatus.OK, {"ok": True})
+        elif path == "/api/control":
+            if type(data.get("enabled")) is not bool:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "enabled는 true 또는 false여야 합니다."})
+                return
+            enabled = self.server.state.set_remote_control(token, data["enabled"])
+            self._json(HTTPStatus.OK, {"remoteControlEnabled": enabled})
         elif path == "/api/logout":
             self.server.state.revoke(token)
             self._json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": "yeon_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
@@ -303,8 +328,8 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.CONFLICT, {"error": "집중 화면 전송을 종료한 후 원격 제어를 사용하세요."})
                 return
             try:
-                if not self.server.state.perform_if_allowed(data):
-                    self._json(HTTPStatus.FORBIDDEN, {"error": "관리 대상 PC에서 원격 제어가 OFF 상태입니다."})
+                if not self.server.state.perform_if_allowed(token, data):
+                    self._json(HTTPStatus.FORBIDDEN, {"error": "관리자 앱에서 원격 제어가 OFF 상태입니다."})
                     return
             except (ValueError, TypeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})

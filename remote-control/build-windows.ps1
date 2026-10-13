@@ -66,10 +66,10 @@ try {
     Write-Host '[5/5] Building Windows EXE...' -ForegroundColor Cyan
     & $venvPython tools/make_icon.py
     if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed.' }
-    & $venvPython -m PyInstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.3.1' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
+    & $venvPython -m PyInstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.3.2' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
     if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
 
-    $exe = Join-Path $appRoot 'dist\YEON-Managed-PC-v1.3.1.exe'
+    $exe = Join-Path $appRoot 'dist\YEON-Managed-PC-v1.3.2.exe'
     if (!(Test-Path $exe)) { throw 'EXE was not created.' }
     Write-Host "SUCCESS: $exe" -ForegroundColor Green
     Start-Process -FilePath explorer.exe -ArgumentList ('/select,"' + $exe + '"')

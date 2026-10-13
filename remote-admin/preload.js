@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('yeonAdmin', Object.freeze({
   focusStop: () => ipcRenderer.invoke('yeon-admin:focus-stop'),
   remoteMode: () => ipcRenderer.invoke('yeon-admin:remote-mode'),
   controlPermission: () => ipcRenderer.invoke('yeon-admin:control-permission'),
+  controlSet: enabled => ipcRenderer.invoke('yeon-admin:control-set', enabled),
   getStatus: () => ipcRenderer.invoke('yeon-admin:status'),
   onStatus: callback => {
     if (typeof callback !== 'function') return;

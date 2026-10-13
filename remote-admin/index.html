@@ -35,7 +35,7 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 <main>
 <div class="brand">YEON · REMOTE ADMIN</div>
 <h1>YEON <span>원격 조정</span></h1>
-<p class="subtitle">관리자 전용 프로그램 v1.3.1<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
+<p class="subtitle">관리자 전용 프로그램 v1.3.2<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
 <section class="card">
 <h2 class="card-title">관리 대상 컴퓨터 연결</h2>
 <form id="connectForm">
@@ -50,7 +50,14 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
   <button type="button" id="remoteMode" class="secondary">🖱 원격 제어 창 열기</button>
   <button type="button" id="focusStop" class="secondary">집중 화면 종료</button>
 </div>
-<p class="notice" id="controlPermission">원격 제어 상태: 확인 중 (관리 대상 PC에서 ON/OFF 설정)</p>
+<section class="notice" aria-label="관리자 원격 제어 ON/OFF">
+  <strong>원격 제어 설정 (관리자)</strong>
+  <div class="mode-actions" style="margin-top:10px">
+    <button type="button" id="controlOn" class="focus" disabled>🖱 원격 제어 ON</button>
+    <button type="button" id="controlOff" class="secondary" disabled>원격 제어 OFF</button>
+  </div>
+  <div id="controlPermission" role="status" style="padding-top:9px">먼저 대상 PC 연결 후 8자리 코드로 로그인하세요.</div>
+</section>
 <p class="notice">집중 화면 전송은 관리자 PC 화면을 관리 대상 PC에 크게 표시합니다. 관리 대상 사용자의 <strong>현장 승인</strong> 후 작동하며, 대상 PC에서 <strong>ESC</strong>로 즉시 중단할 수 있습니다.</p>
 <div class="statusbox"><span class="dot"></span><span id="status">대기 중</span></div>
 </section>
@@ -59,7 +66,7 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 <p><span class="num">01</span> 관리받는 PC에서 <b>YEON 원격 조정 (공유용)</b> 앱 실행</p>
 <p><span class="num">02</span> 해당 PC에서 <b>공유 시작</b>을 눌러 주소와 8자리 코드를 확인</p>
 <p><span class="num">03</span> 이 관리자 앱에 주소 입력 → 원격 조정 창이 자동으로 열림</p>
-<p><span class="num">04</span> 열린 창에 8자리 코드를 입력하면 화면·마우스·키보드 사용 가능</p>
+<p><span class="num">04</span> 열린 창에 8자리 코드를 입력한 뒤 관리자에서 원격 제어 ON 선택</p>
 </section>
 <div class="footer">같은 Wi-Fi/사설 네트워크에서만 연결 · 상대방의 동의 필요 · 인터넷 공개 연결 미지원</div>
 </main>
@@ -80,14 +87,27 @@ $('focusStart').addEventListener('click',async()=>{
   if(!r.ok)$('error').textContent=r.error||'전송을 시작할 수 없습니다.';
 });
 $('focusStop').addEventListener('click',()=>window.yeonAdmin.focusStop());
+async function setAdminControl(enabled){
+  $('error').textContent='';
+  $('controlOn').disabled=true; $('controlOff').disabled=true;
+  try {
+    const result=await window.yeonAdmin.controlSet(enabled);
+    if(!result.ok)$('error').textContent=result.error||'원격 제어 상태를 변경하지 못했습니다.';
+  } catch { $('error').textContent='원격 제어 ON/OFF 요청 중 오류가 발생했습니다.'; }
+  await refreshPermission();
+}
+$('controlOn').addEventListener('click',()=>setAdminControl(true));
+$('controlOff').addEventListener('click',()=>setAdminControl(false));
 $('remoteMode').addEventListener('click',async()=>{
   $('error').textContent=''; const r=await window.yeonAdmin.remoteMode();
   if(!r.ok)$('error').textContent=r.error||'원격 제어 모드를 열 수 없습니다.';
 });
 async function refreshPermission(){
   const result=await window.yeonAdmin.controlPermission().catch(()=>({ok:false}));
-  $('controlPermission').textContent=!result.ok ? '원격 제어 상태: 관리 대상 PC 로그인 후 확인 가능' :
-     (result.enabled ? '● 원격 제어 ON · 관리 대상 PC에서 허용했습니다.' : '● 원격 제어 OFF · 대상 PC에서 ON으로 변경해야 마우스/키보드를 조작할 수 있습니다.');
+  $('controlOn').disabled = !result.ok || result.enabled;
+  $('controlOff').disabled = !result.ok || !result.enabled;
+  $('controlPermission').textContent=!result.ok ? '원격 제어 상태: 대상 PC의 8자리 코드 로그인 후 변경할 수 있습니다.' :
+     (result.enabled ? '● 원격 제어 ON · 관리자에서 마우스·키보드 조작을 허용했습니다.' : '● 원격 제어 OFF · 화면만 볼 수 있습니다.');
 }
 setInterval(refreshPermission,3500);
 refreshPermission();

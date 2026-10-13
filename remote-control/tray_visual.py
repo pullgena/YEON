@@ -4,7 +4,7 @@ from __future__ import annotations
 from PIL import Image, ImageDraw, ImageFont
 
 
-VERSION = "1.3.1"
+VERSION = "1.3.2"
 
 
 def make_tray_icon(sharing: bool, size: int = 64) -> Image.Image:
