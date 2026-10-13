@@ -35,6 +35,11 @@ class FakeTray:
 class FakeState:
     def __init__(self):
         self.ended = False
+        self.remote = False
+    def can_remote_control(self):
+        return self.remote
+    def set_remote_control(self, enabled):
+        self.remote = bool(enabled)
     def end(self):
         self.ended = True
 
@@ -48,6 +53,14 @@ class FakeServer:
         pass
 
 
+class FakeControlButton:
+    def __init__(self): self.settings = {}
+    def config(self, **kwargs): self.settings.update(kwargs)
+
+class FakeStringVar:
+    def __init__(self): self.value = ''
+    def set(self, value): self.value = value
+
 class BackgroundBehaviorTests(unittest.TestCase):
     def prepare(self, active=True):
         app = ManagedDesktopApp.__new__(ManagedDesktopApp)
@@ -56,6 +69,9 @@ class BackgroundBehaviorTests(unittest.TestCase):
         app.tray_ready = True
         app.hide_notice_sent = False
         app.closing = False
+        app.stopping = False
+        app.control_btn = FakeControlButton()
+        app.control_status = FakeStringVar()
         app.server = FakeServer() if active else None
         return app
 
@@ -78,6 +94,17 @@ class BackgroundBehaviorTests(unittest.TestCase):
         app._refresh_tray()
         self.assertIn('공유 중지',app.tray.title)
         self.assertNotEqual(active_icon,app.tray.icon.tobytes())
+
+    def test_local_toggle_controls_remote_authority_and_tray(self):
+        app=self.prepare()
+        self.assertFalse(app.server.state.can_remote_control())
+        app.toggle_remote_control()
+        self.assertTrue(app.server.state.can_remote_control())
+        self.assertIn('ON', app.tray.title)
+        self.assertIn('OFF로 변경', app.control_btn.settings['text'])
+        app.toggle_remote_control()
+        self.assertFalse(app.server.state.can_remote_control())
+        self.assertIn('OFF', app.tray.title)
 
     def test_full_quit_revokes_sessions(self):
         app = self.prepare()

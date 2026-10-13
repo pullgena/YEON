@@ -2,7 +2,7 @@
 const {app, BrowserWindow, ipcMain, Menu, session, desktopCapturer} = require('electron');
 const path = require('node:path');
 const {parseTarget} = require('./target');
-const {FocusSender} = require('./focus_transport');
+const {FocusSender, send, cookieForSession} = require('./focus_transport');
 
 let dashboard = null;
 let remote = null;
@@ -83,7 +83,7 @@ function openController(address) {
 function createDashboard() {
   dashboard = new BrowserWindow({
     width: 720, height: 700, minWidth: 590, minHeight: 580,
-    title: 'YEON 원격 조정 - 관리자 v1.3.0',
+    title: 'YEON 원격 조정 - 관리자 v1.3.1',
     backgroundColor: '#0b1020',
     autoHideMenuBar: true,
     webPreferences: {
@@ -119,12 +119,25 @@ app.whenReady().then(() => {
     await focusSender.stop(); setStatus('집중 화면 전송 종료됨');
     return {ok:true};
   });
+  ipcMain.handle('yeon-admin:control-permission', async event => {
+    if (event.sender !== dashboard?.webContents || !currentAddress) return {ok:false};
+    try {
+      const cookie = await cookieForSession(session.defaultSession, currentAddress);
+      const info = await send(currentAddress, '/api/status', {method:'GET', cookie});
+      return {ok:true, enabled:info.remoteControlEnabled === true};
+    } catch { return {ok:false}; }
+  });
   ipcMain.handle('yeon-admin:remote-mode', async event => {
     if (event.sender !== dashboard?.webContents) return {ok:false};
     if (!currentAddress) return {ok:false,error:'관리 대상 PC에 먼저 연결하세요.'};
     await focusSender.stop();
+    try {
+      const cookie = await cookieForSession(session.defaultSession, currentAddress);
+      const info = await send(currentAddress, '/api/status', {method:'GET', cookie});
+      if (!info.remoteControlEnabled) return {ok:false,error:'관리 대상 PC에서 원격 제어가 OFF입니다. 관리 대상에서 ON으로 변경하세요.'};
+    } catch (error) { return {ok:false,error:error.message}; }
     if (remote && !remote.isDestroyed()) {remote.show();remote.focus();}
-    setStatus('원격 제어 모드 · 관리 대상 PC 화면에서 마우스와 키보드를 조작하세요.');
+    setStatus('원격 제어 ON · 관리 대상 PC에서 허용함');
     return {ok:true};
   });
   ipcMain.handle('yeon-admin:connect', (_event, address) => {

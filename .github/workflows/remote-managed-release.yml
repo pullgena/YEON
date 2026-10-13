@@ -35,24 +35,24 @@ jobs:
       - name: Build Windows single-file EXE
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.3.0' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
-          if (!(Test-Path 'dist/YEON-Managed-PC-v1.3.0.exe')) { throw 'Managed PC EXE missing' }
+          pyinstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.3.1' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
+          if (!(Test-Path 'dist/YEON-Managed-PC-v1.3.1.exe')) { throw 'Managed PC EXE missing' }
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YEON-Managed-PC-v1.3.0-Windows
-          path: remote-control/dist/YEON-Managed-PC-v1.3.0.exe
+          name: YEON-Managed-PC-v1.3.1-Windows
+          path: remote-control/dist/YEON-Managed-PC-v1.3.1.exe
           if-no-files-found: error
       - name: Publish managed PC release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'remote-managed-v1.3.0'
-          $asset = 'dist/YEON-Managed-PC-v1.3.0.exe'
+          $tag = 'remote-managed-v1.3.1'
+          $asset = 'dist/YEON-Managed-PC-v1.3.1.exe'
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $asset --clobber
           } else {
-            gh release create $tag $asset --title 'YEON 원격 조정 - 관리 대상 v1.3.0' --notes 'Windows managed PC app with visible tray icon. Window X hides to tray; screen sharing begins only after manual activation. Tray menu supports open, share stop, and quit. LAN only.' --target $env:GITHUB_SHA
+            gh release create $tag $asset --title 'YEON 원격 조정 - 관리 대상 v1.3.1' --notes 'Windows managed PC app v1.3.1 with remote mouse/keyboard control ON/OFF (default OFF, locally enforced). Screen sharing remains active in read-only mode. Visible tray icon, focus display with emergency ESC, and LAN-only connections.' --target $env:GITHUB_SHA
           }

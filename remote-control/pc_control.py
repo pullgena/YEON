@@ -9,6 +9,8 @@ class PCController:
     def __init__(self):
         self._input_lock = threading.RLock()
         self._screen_lock = threading.Lock()
+        self._held_buttons = set()
+        self._held_keys = set()
         import pyautogui
         import mss
         from PIL import Image
@@ -17,6 +19,17 @@ class PCController:
         self.Image = Image
         self.pg.FAILSAFE = True  # Move host mouse to top-left to trigger input failsafe.
         self.pg.PAUSE = 0.01
+
+    def release_all(self) -> None:
+        with self._input_lock:
+            for button in tuple(self._held_buttons):
+                try: self.pg.mouseUp(button=button)
+                except Exception: pass
+            self._held_buttons.clear()
+            for key in tuple(self._held_keys):
+                try: self.pg.keyUp(key)
+                except Exception: pass
+            self._held_keys.clear()
 
     def _monitor(self):
         with self.mss.mss() as sct:
@@ -59,6 +72,8 @@ class PCController:
                     if button not in ("left", "right", "middle"):
                         raise ValueError("잘못된 마우스 버튼")
                     (self.pg.mouseDown if op == "down" else self.pg.mouseUp)(button=button)
+                    if op == 'down': self._held_buttons.add(button)
+                    else: self._held_buttons.discard(button)
             elif op == "scroll":
                 amount = data.get("amount")
                 if not isinstance(amount, (int, float)) or isinstance(amount, bool) or not -10 <= amount <= 10:
@@ -69,6 +84,8 @@ class PCController:
                 if not isinstance(key, str) or len(key) > 32 or key not in self.pg.KEYBOARD_KEYS:
                     raise ValueError("지원하지 않는 키입니다.")
                 (self.pg.keyDown if op == "keyDown" else self.pg.keyUp)(key)
+                if op == 'keyDown': self._held_keys.add(key)
+                else: self._held_keys.discard(key)
             elif op == "text":
                 text = data.get("text")
                 if not isinstance(text, str) or not 0 < len(text) <= 1000:

@@ -35,7 +35,7 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 <main>
 <div class="brand">YEON · REMOTE ADMIN</div>
 <h1>YEON <span>원격 조정</span></h1>
-<p class="subtitle">관리자 전용 프로그램 v1.3.0<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
+<p class="subtitle">관리자 전용 프로그램 v1.3.1<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
 <section class="card">
 <h2 class="card-title">관리 대상 컴퓨터 연결</h2>
 <form id="connectForm">
@@ -47,9 +47,10 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 <div class="error" id="error" role="alert"></div>
 <div class="mode-actions">
   <button type="button" id="focusStart" class="focus">▣ 집중 화면 전송</button>
-  <button type="button" id="remoteMode" class="secondary">🖱 원격 제어</button>
+  <button type="button" id="remoteMode" class="secondary">🖱 원격 제어 창 열기</button>
   <button type="button" id="focusStop" class="secondary">집중 화면 종료</button>
 </div>
+<p class="notice" id="controlPermission">원격 제어 상태: 확인 중 (관리 대상 PC에서 ON/OFF 설정)</p>
 <p class="notice">집중 화면 전송은 관리자 PC 화면을 관리 대상 PC에 크게 표시합니다. 관리 대상 사용자의 <strong>현장 승인</strong> 후 작동하며, 대상 PC에서 <strong>ESC</strong>로 즉시 중단할 수 있습니다.</p>
 <div class="statusbox"><span class="dot"></span><span id="status">대기 중</span></div>
 </section>
@@ -83,7 +84,14 @@ $('remoteMode').addEventListener('click',async()=>{
   $('error').textContent=''; const r=await window.yeonAdmin.remoteMode();
   if(!r.ok)$('error').textContent=r.error||'원격 제어 모드를 열 수 없습니다.';
 });
-window.yeonAdmin.onStatus(data=>{$('status').textContent=data.status||'대기 중';});
+async function refreshPermission(){
+  const result=await window.yeonAdmin.controlPermission().catch(()=>({ok:false}));
+  $('controlPermission').textContent=!result.ok ? '원격 제어 상태: 관리 대상 PC 로그인 후 확인 가능' :
+     (result.enabled ? '● 원격 제어 ON · 관리 대상 PC에서 허용했습니다.' : '● 원격 제어 OFF · 대상 PC에서 ON으로 변경해야 마우스/키보드를 조작할 수 있습니다.');
+}
+setInterval(refreshPermission,3500);
+refreshPermission();
+window.yeonAdmin.onStatus(data=>{$('status').textContent=data.status||'대기 중';refreshPermission();});
 window.yeonAdmin.getStatus().then(data=>{if(data)$('status').textContent=data.status;});
 $('address').focus();
 </script>

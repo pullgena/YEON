@@ -62,6 +62,7 @@ class APITests(unittest.TestCase):
         self.assertIn('HttpOnly', cookie)
         code, body, _ = self.connect('GET', '/api/status', cookie=token)
         self.assertEqual(json.loads(body)['width'], 1920)
+        self.srv.state.set_remote_control(True)
         code, _, _ = self.connect('POST', '/api/action', {'type':'move','x':0.5,'y':0.3}, cookie=token)
         self.assertEqual(code, 200)
         self.assertEqual(len(self.control.actions), 1)

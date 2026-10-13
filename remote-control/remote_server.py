@@ -36,6 +36,29 @@ class ShareState:
         self.lock = threading.RLock()
         self.active = True
         self.focus = FocusSession()
+        self.remote_control_enabled = False  # local-only permission; reset on every share
+
+    def can_remote_control(self) -> bool:
+        with self.lock:
+            return self.active and self.remote_control_enabled
+
+    def set_remote_control(self, enabled: bool) -> bool:
+        """Only the managed-PC GUI/tray calls this. Never expose a network toggle."""
+        with self.lock:
+            self.remote_control_enabled = bool(enabled) and self.active
+            if not self.remote_control_enabled:
+                release = getattr(self.controller, 'release_all', None)
+                if callable(release):
+                    release()
+            return self.remote_control_enabled
+
+    def perform_if_allowed(self, data: dict) -> bool:
+        # Hold the same lock during input, so an OFF click cannot race an action.
+        with self.lock:
+            if not self.active or not self.remote_control_enabled:
+                return False
+            self.controller.perform(data)
+            return True
 
     def authenticate(self, address: str, pin: str) -> str | None:
         now = time.monotonic()
@@ -76,7 +99,11 @@ class ShareState:
     def end(self) -> None:
         with self.lock:
             self.active = False
+            self.remote_control_enabled = False
             self.sessions.clear()
+            release = getattr(self.controller, 'release_all', None)
+            if callable(release):
+                release()
             self.focus.stop()
 
     def connections(self) -> int:
@@ -105,7 +132,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.0"
+    server_version = "YEONManaged/1.3.1"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -175,7 +202,7 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 return
             try:
                 w, h = self.server.state.controller.screen_size()
-                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h})
+                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h, "remoteControlEnabled": self.server.state.can_remote_control()})
             except Exception:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "화면 크기를 읽을 수 없습니다."})
         elif path == "/api/focus/status":
@@ -276,7 +303,9 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.CONFLICT, {"error": "집중 화면 전송을 종료한 후 원격 제어를 사용하세요."})
                 return
             try:
-                self.server.state.controller.perform(data)
+                if not self.server.state.perform_if_allowed(data):
+                    self._json(HTTPStatus.FORBIDDEN, {"error": "관리 대상 PC에서 원격 제어가 OFF 상태입니다."})
+                    return
             except (ValueError, TypeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
