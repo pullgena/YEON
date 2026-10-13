@@ -1,0 +1,28 @@
+{
+  "name": "yeon-remote-admin",
+  "version": "1.1.0",
+  "productName": "YEON 원격 조정 - 관리자",
+  "description": "YEON 원격 조정: administrator controller for LAN-connected Windows devices",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "build:win": "electron-builder --win portable --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "kr.yeon.remote.admin",
+    "productName": "YEON 원격 조정 관리자",
+    "asar": true,
+    "files": ["main.js", "preload.js", "index.html", "target.js", "package.json"],
+    "directories": {"output": "dist"},
+    "win": {
+      "target": [{"target": "portable", "arch": ["x64"]}],
+      "artifactName": "YEON-Remote-Admin-v${version}.exe"
+    }
+  }
+}
