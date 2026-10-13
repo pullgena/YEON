@@ -99,7 +99,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONRemote/1.0.1"
+    server_version = "YEONManaged/1.2.0"
     sys_version = ""
 
     def log_message(self, fmt, *args):

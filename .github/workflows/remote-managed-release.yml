@@ -1,0 +1,58 @@
+name: YEON Managed PC Windows Build and Release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'remote-control/**'
+      - '.github/workflows/remote-managed-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  managed-windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: remote-control
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: remote-control/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Check source syntax
+        run: python -m compileall -q app.py pc_control.py remote_server.py tray_visual.py tools/make_icon.py
+      - name: Run API and tray icon tests
+        run: python -m unittest discover -s tests -v
+      - name: Generate Windows app and tray icons
+        run: python tools/make_icon.py
+      - name: Build Windows single-file EXE
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.2.0' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
+          if (!(Test-Path 'dist/YEON-Managed-PC-v1.2.0.exe')) { throw 'Managed PC EXE missing' }
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YEON-Managed-PC-v1.2.0-Windows
+          path: remote-control/dist/YEON-Managed-PC-v1.2.0.exe
+          if-no-files-found: error
+      - name: Publish managed PC release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'remote-managed-v1.2.0'
+          $asset = 'dist/YEON-Managed-PC-v1.2.0.exe'
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          } else {
+            gh release create $tag $asset --title 'YEON 원격 조정 - 관리 대상 v1.2.0' --notes 'Windows managed PC app with visible tray icon. Window X hides to tray; screen sharing begins only after manual activation. Tray menu supports open, share stop, and quit. LAN only.' --target $env:GITHUB_SHA
+          }

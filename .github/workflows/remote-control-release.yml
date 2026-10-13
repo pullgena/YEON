@@ -1,11 +1,8 @@
 name: YEON 원격 조정 Windows Release
 
+# Legacy v1.0.1 workflow kept for manual historical rebuild only.
+# Managed PC v1.2.0 has a separate trigger and release tag.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'remote-control/**'
-      - '.github/workflows/remote-control-release.yml'
   workflow_dispatch:
 
 permissions:
