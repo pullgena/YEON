@@ -17,9 +17,11 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+from focus_mode import FocusSession
 
 PIN_TTL_SECONDS = 60 * 60
 MAX_BODY = 8 * 1024
+MAX_FOCUS_JPEG = 900_000
 MAX_FAILURES = 5
 FAIL_WINDOW = 60
 
@@ -33,6 +35,7 @@ class ShareState:
         self.failures: dict[str, deque[float]] = defaultdict(deque)
         self.lock = threading.RLock()
         self.active = True
+        self.focus = FocusSession()
 
     def authenticate(self, address: str, pin: str) -> str | None:
         now = time.monotonic()
@@ -67,11 +70,14 @@ class ShareState:
         if token:
             with self.lock:
                 self.sessions.pop(token, None)
+            if self.focus.owner == token:
+                self.focus.stop()
 
     def end(self) -> None:
         with self.lock:
             self.active = False
             self.sessions.clear()
+            self.focus.stop()
 
     def connections(self) -> int:
         now = time.monotonic()
@@ -99,7 +105,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.2.0"
+    server_version = "YEONManaged/1.3.0"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -172,6 +178,12 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h})
             except Exception:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "화면 크기를 읽을 수 없습니다."})
+        elif path == "/api/focus/status":
+            token = self._token()
+            if not self.server.state.authenticated(token):
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
+                return
+            self._json(HTTPStatus.OK, {"mode": self.server.state.focus.status(token)})
         elif path == "/api/frame":
             if not self.server.state.authenticated(self._token()):
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
@@ -192,6 +204,27 @@ class RemoteHandler(BaseHTTPRequestHandler):
             return
         if not self._check_origin():
             self._json(HTTPStatus.FORBIDDEN, {"error": "잘못된 요청 출처입니다."})
+            return
+        path = urlsplit(self.path).path
+        if path == "/api/focus/frame":
+            token = self._token()
+            if not self.server.state.authenticated(token):
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
+                return
+            if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "image/jpeg":
+                self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "JPEG 형식만 허용"})
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = -1
+            if not 4 <= length <= MAX_FOCUS_JPEG:
+                self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "화면 크기 초과"})
+                return
+            if not self.server.state.focus.push(token, self.rfile.read(length)):
+                self._json(HTTPStatus.CONFLICT, {"error": "집중 모드 허용 필요"})
+                return
+            self._json(HTTPStatus.OK, {"ok": True})
             return
         if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
             self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "JSON 형식만 허용합니다."})
@@ -225,10 +258,23 @@ class RemoteHandler(BaseHTTPRequestHandler):
         if not self.server.state.authenticated(token):
             self._json(HTTPStatus.UNAUTHORIZED, {"error": "로그인이 필요합니다."})
             return
-        if path == "/api/logout":
+        if path == "/api/focus/request":
+            if not self.server.state.focus.request(token):
+                self._json(HTTPStatus.CONFLICT, {"error": "이미 집중 화면 요청/전송이 진행 중입니다."})
+                return
+            self._json(HTTPStatus.OK, {"mode": "pending"})
+        elif path == "/api/focus/stop":
+            if not self.server.state.focus.stop(token):
+                self._json(HTTPStatus.FORBIDDEN, {"error": "전송 중인 관리자만 종료할 수 있습니다."})
+                return
+            self._json(HTTPStatus.OK, {"ok": True})
+        elif path == "/api/logout":
             self.server.state.revoke(token)
             self._json(HTTPStatus.OK, {"ok": True}, {"Set-Cookie": "yeon_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0"})
         elif path == "/api/action":
+            if self.server.state.focus.latest()[0] == 'active':
+                self._json(HTTPStatus.CONFLICT, {"error": "집중 화면 전송을 종료한 후 원격 제어를 사용하세요."})
+                return
             try:
                 self.server.state.controller.perform(data)
             except (ValueError, TypeError) as exc:

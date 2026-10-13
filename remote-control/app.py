@@ -11,6 +11,7 @@ from tkinter import messagebox, ttk
 
 from remote_server import RemoteHTTPServer
 from tray_visual import VERSION, make_tray_icon, status_title
+from focus_mode import FocusOverlay
 
 PORT = 8765
 
@@ -53,6 +54,8 @@ class ManagedDesktopApp:
         self.tray = None
         self.tray_ready = False
         self.hide_notice_sent = False
+        self.focus_overlay = None
+        self.focus_prompt_open = False
         try:
             self.root.iconbitmap(str(resource_path("assets/yeon-managed.ico")))
         except (tk.TclError, OSError):
@@ -187,6 +190,8 @@ class ManagedDesktopApp:
         srv = self.server
         if not srv:
             return
+        if getattr(self, 'focus_overlay', None):
+            self.focus_overlay.stop()
         self.server = None
         self.stopping = True
         srv.state.end()  # Revoke existing sessions immediately, including hidden-window sharing.
@@ -222,8 +227,39 @@ class ManagedDesktopApp:
             return
         if self.server:
             self.status.set(f"● 공유 중 · 연결된 기기 {self.server.state.connections()}개")
+            focus = self.server.state.focus
+            if focus.pending() and not self.focus_prompt_open:
+                self.focus_prompt_open = True
+                self.root.after(0, self.ask_focus_permission)
+            if self.focus_overlay and focus.latest()[0] != 'active':
+                self.focus_overlay.close()
+                self.focus_overlay = None
         self._refresh_tray()
-        self.root.after(2500, self.refresh_status)
+        self.root.after(650, self.refresh_status)
+
+    def ask_focus_permission(self):
+        try:
+            if not self.server or not self.server.state.focus.pending():
+                return
+            # This prompt is shown on the managed PC even when its main window was hidden.
+            self.show_window()
+            approved = messagebox.askyesno(
+                'YEON 집중 화면 전송 승인',
+                '관리자가 자신의 화면을 이 PC에 전체 화면으로 전송하려고 합니다.\n\n'
+                '승인하면 일반 데스크톱 조작이 전체 화면 안내로 가려집니다.\n'
+                'ESC 또는 화면 아래의 빨간 종료 버튼으로 언제든 중지할 수 있습니다.\n\n'
+                '집중 화면 전송을 허용하시겠습니까?', parent=self.root)
+            if self.server and self.server.state.focus.pending():
+                if approved and self.server.state.focus.accept():
+                    self.focus_overlay = FocusOverlay(self.root, self.server.state.focus, self.focus_exited)
+                else:
+                    self.server.state.focus.deny()
+        finally:
+            self.focus_prompt_open = False
+
+    def focus_exited(self):
+        self.focus_overlay = None
+        self.status.set('● 집중 화면이 관리 대상 PC에서 종료되었습니다.')
 
     def hide_window(self):
         if self.closing:
@@ -253,6 +289,8 @@ class ManagedDesktopApp:
         self.closing = True
         srv = self.server
         self.server = None
+        if getattr(self, 'focus_overlay', None):
+            self.focus_overlay.stop()
         if srv:
             srv.state.end()
             # Background thread only tears down the listener; sessions are already revoked.

@@ -1,12 +1,14 @@
 'use strict';
-const {app, BrowserWindow, ipcMain, Menu, session} = require('electron');
+const {app, BrowserWindow, ipcMain, Menu, session, desktopCapturer} = require('electron');
 const path = require('node:path');
 const {parseTarget} = require('./target');
+const {FocusSender} = require('./focus_transport');
 
 let dashboard = null;
 let remote = null;
 let currentAddress = '';
 let status = '대기 중';
+let focusSender = null;
 
 function emitStatus() {
   if (dashboard && !dashboard.isDestroyed()) {
@@ -18,6 +20,7 @@ function emitStatus() {
 function setStatus(value) {status = value; emitStatus();}
 
 function closeRemote() {
+  if (focusSender) void focusSender.stop();
   if (remote && !remote.isDestroyed()) remote.close();
   remote = null;
   currentAddress = '';
@@ -80,7 +83,7 @@ function openController(address) {
 function createDashboard() {
   dashboard = new BrowserWindow({
     width: 720, height: 700, minWidth: 590, minHeight: 580,
-    title: 'YEON 원격 조정 - 관리자 v1.1.0',
+    title: 'YEON 원격 조정 - 관리자 v1.3.0',
     backgroundColor: '#0b1020',
     autoHideMenuBar: true,
     webPreferences: {
@@ -92,12 +95,38 @@ function createDashboard() {
   dashboard.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   dashboard.webContents.on('will-navigate', (event) => event.preventDefault());
   dashboard.loadFile(path.join(__dirname, 'index.html'));
-  dashboard.on('closed', () => {dashboard = null; closeRemote();});
+  dashboard.on('closed', () => {if(focusSender) void focusSender.stop(); dashboard = null; closeRemote();});
 }
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  focusSender = new FocusSender({
+    electronSession: session.defaultSession, desktopCapturer,
+    onStatus: (message) => setStatus(message)
+  });
+  ipcMain.handle('yeon-admin:focus-start', async (event) => {
+    if (event.sender !== dashboard?.webContents) return {ok:false, error:'잘못된 요청입니다.'};
+    if (!currentAddress) return {ok:false,error:'먼저 관리 대상 PC에 연결하세요.'};
+    if (focusSender.active) return {ok:false,error:'이미 집중 화면을 전송하고 있습니다.'};
+    const address = currentAddress;
+    // Do not hold up the user-interface response for a full streaming session.
+    void focusSender.start(address).catch(error => setStatus(`집중 모드: ${error.message}`));
+    return {ok:true};
+  });
+  ipcMain.handle('yeon-admin:focus-stop', async event => {
+    if (event.sender !== dashboard?.webContents) return {ok:false};
+    await focusSender.stop(); setStatus('집중 화면 전송 종료됨');
+    return {ok:true};
+  });
+  ipcMain.handle('yeon-admin:remote-mode', async event => {
+    if (event.sender !== dashboard?.webContents) return {ok:false};
+    if (!currentAddress) return {ok:false,error:'관리 대상 PC에 먼저 연결하세요.'};
+    await focusSender.stop();
+    if (remote && !remote.isDestroyed()) {remote.show();remote.focus();}
+    setStatus('원격 제어 모드 · 관리 대상 PC 화면에서 마우스와 키보드를 조작하세요.');
+    return {ok:true};
+  });
   ipcMain.handle('yeon-admin:connect', (_event, address) => {
     if (!_event.sender || _event.sender !== dashboard?.webContents) return {ok: false, error: '잘못된 요청입니다.'};
     try {return openController(address);}

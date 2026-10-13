@@ -56,7 +56,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 
     Write-Host '[3/5] Checking source syntax...' -ForegroundColor Cyan
-    & $venvPython -m compileall -q app.py pc_control.py remote_server.py tray_visual.py tools/make_icon.py
+    & $venvPython -m compileall -q app.py pc_control.py remote_server.py focus_mode.py tray_visual.py tools/make_icon.py
     if ($LASTEXITCODE -ne 0) { throw 'Python syntax check failed.' }
 
     Write-Host '[4/5] Running tests...' -ForegroundColor Cyan
@@ -66,10 +66,10 @@ try {
     Write-Host '[5/5] Building Windows EXE...' -ForegroundColor Cyan
     & $venvPython tools/make_icon.py
     if ($LASTEXITCODE -ne 0) { throw 'Icon generation failed.' }
-    & $venvPython -m PyInstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.2.0' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
+    & $venvPython -m PyInstaller --noconfirm --clean --onefile --windowed --name 'YEON-Managed-PC-v1.3.0' --icon 'assets/yeon-managed.ico' --add-data 'assets/yeon-managed.ico;assets' --add-data 'web/index.html;web' --hidden-import 'pystray._win32' app.py
     if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
 
-    $exe = Join-Path $appRoot 'dist\YEON-Managed-PC-v1.2.0.exe'
+    $exe = Join-Path $appRoot 'dist\YEON-Managed-PC-v1.3.0.exe'
     if (!(Test-Path $exe)) { throw 'EXE was not created.' }
     Write-Host "SUCCESS: $exe" -ForegroundColor Green
     Start-Process -FilePath explorer.exe -ArgumentList ('/select,"' + $exe + '"')
