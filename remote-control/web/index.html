@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101425">
+  <title>YEON 원격 조정</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,-apple-system,'Malgun Gothic',sans-serif;--bg:#0b1020;--card:#172033;--stroke:#2b364f;--accent:#818cf8;--light:#f5f7ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(ellipse at 70% -10%,#293361 0%,transparent 45%),var(--bg);color:var(--light)}
+    button,input,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+    .brand{font-size:13px;font-weight:800;letter-spacing:.15em;color:#a5b4fc}.muted{color:#a3acc5}.hidden{display:none!important}
+    .login-wrap{display:grid;place-items:center;min-height:100dvh;padding:20px}.login-card{width:min(100%,410px);border:1px solid var(--stroke);border-radius:24px;background:linear-gradient(150deg,#1e2942,#131a2c);padding:30px;box-shadow:0 18px 80px #0008}
+    .login-card h1{font-size:29px;margin:25px 0 8px}.login-card p{line-height:1.7}.label{display:block;color:#cbd5e1;font-size:14px;margin:26px 0 8px}
+    .pin{display:block;width:100%;padding:15px 18px;border:1px solid #485678;background:#0e1628;border-radius:13px;color:white;font-size:22px;letter-spacing:5px;text-align:center;outline:none}.pin:focus{border-color:var(--accent)}
+    .primary{background:#6366f1;color:white;border:0;border-radius:13px;padding:14px 18px;font-weight:750}.primary:hover{background:#7779fa}.login-btn{width:100%;margin-top:14px}
+    .error{margin:10px 0 0;color:#fda4af;font-size:13px;min-height:20px}.help{font-size:12px;color:#9ba8c4;margin-top:25px;border-top:1px solid var(--stroke);padding-top:16px}
+    .app{min-height:100dvh;display:flex;flex-direction:column}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px clamp(14px,3vw,32px);border-bottom:1px solid var(--stroke);background:#10182b}
+    .top h1{margin:5px 0 0;font-size:18px}.status{display:flex;align-items:center;gap:7px;color:#cbd5e1;font-size:12px}.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 9px #34d399}
+    .top-actions{display:flex;align-items:center;gap:10px}.ghost{background:#283248;border:1px solid #394761;border-radius:11px;color:#e3e8fa;padding:10px 12px}.ghost:hover{background:#36425b}.danger{border-color:#854953;color:#fda4af}
+    .content{width:min(1600px,100%);margin:auto;display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;padding:18px;flex:1;align-items:start}
+    .screen-panel{min-width:0;border-radius:17px;background:#111827;overflow:hidden;border:1px solid var(--stroke)}
+    .panel-label{padding:12px 15px;border-bottom:1px solid #2c3550;display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#a4b4db}
+    .screen{width:100%;aspect-ratio:16/9;display:grid;place-items:center;position:relative;background:repeating-conic-gradient(#121827 0% 25%,#192135 0% 50%) 50%/20px 20px;max-height:calc(100dvh - 173px);min-height:245px}
+    .screen img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;touch-action:none;cursor:crosshair}
+    .screen-placeholder{position:absolute;pointer-events:none;text-align:center;color:#9caaca;font-size:13px}.screen img:not([src]){opacity:0}
+    .hint{padding:11px 15px;font-size:12px;color:#8796b5}.side{display:grid;gap:14px}.section{border:1px solid var(--stroke);border-radius:16px;background:#172033;padding:17px}
+    .section h2{font-size:14px;margin:0 0 14px;color:#d5ddf5}.shortcut-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.shortcut-grid button{min-height:45px;font-size:13px}
+    textarea{width:100%;min-height:85px;resize:vertical;background:#111827;border:1px solid #3a4560;color:white;border-radius:9px;padding:11px;outline:none;line-height:1.6;font-size:14px}
+    textarea:focus{border-color:#818cf8}.full{width:100%;margin-top:10px}.foot{padding:12px 20px;text-align:center;color:#8190b0;font-size:11px}
+    #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:25px;background:#38445b;border:1px solid #7180a6;border-radius:12px;padding:10px 16px;font-size:13px;box-shadow:0 8px 35px #0009;max-width:90%;z-index:3;display:none}
+    @media(max-width:980px){.content{grid-template-columns:1fr}.side{grid-template-columns:repeat(2,minmax(0,1fr))}.screen{max-height:none}}
+    @media(max-width:600px){.content{padding:10px;gap:10px}.screen{min-height:180px;max-height:none}.side{grid-template-columns:1fr}.top{padding:12px}.top h1{font-size:16px}.top .brand{font-size:10px}.top-actions .status{display:none}.shortcut-grid{grid-template-columns:repeat(3,1fr)}.login-card{padding:25px}}
+  </style>
+</head>
+<body>
+  <main class="login-wrap" id="loginView">
+    <section class="login-card">
+      <div class="brand">YEON / 원격 조정</div>
+      <h1>내 PC에 연결</h1>
+      <p class="muted">컴퓨터에 실행된 YEON 원격 조정 앱에서 표시하는 <strong>8자리 접속 코드</strong>를 입력하세요.</p>
+      <form id="loginForm">
+        <label class="label" for="pin">접속 코드</label>
+        <input class="pin" name="pin" id="pin" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" maxlength="8" placeholder="00000000" required autofocus>
+        <button type="submit" class="primary login-btn" id="loginButton">원격 조종 시작 →</button>
+        <div class="error" id="loginError" role="alert"></div>
+      </form>
+      <div class="help">🔒 같은 Wi-Fi에서만 접속하는 시험용 앱입니다. 신뢰할 수 없는 공용 Wi-Fi에서는 사용하지 마세요. PC 앱에서 공유를 종료하면 연결이 즉시 끊어집니다.</div>
+    </section>
+  </main>
+
+  <div class="app hidden" id="appView">
+    <header class="top">
+      <div><span class="brand">YEON · 원격 조정</span><h1>내 컴퓨터</h1></div>
+      <div class="top-actions"><div class="status"><span class="dot"></span><span id="connectionStatus">연결됨</span></div><button class="ghost danger" id="disconnect">연결 끊기</button></div>
+    </header>
+    <div class="content">
+      <section class="screen-panel">
+        <div class="panel-label"><span>● 실시간 화면 <span id="resolution"></span></span><span id="frameInfo">연결 준비 중</span></div>
+        <div class="screen" id="screen"><div class="screen-placeholder" id="placeholder">화면을 불러오는 중...</div><img id="frame" alt="연결된 컴퓨터의 화면" draggable="false"></div>
+        <div class="hint">🖱️ 클릭 · 드래그 · 우클릭 · 스크롤 지원 · PC 키보드를 누르면 원격 PC로 전달됩니다.</div>
+      </section>
+      <aside class="side">
+        <section class="section">
+          <h2>빠른 조작</h2>
+          <div class="shortcut-grid">
+            <button class="ghost" data-hotkey="desktop">⌘ 바탕화면</button>
+            <button class="ghost" data-hotkey="switch">창 전환</button>
+            <button class="ghost" data-hotkey="escape">ESC</button>
+            <button class="ghost" data-hotkey="enter">↵ Enter</button>
+            <button class="ghost" data-hotkey="backspace">⌫ 지우기</button>
+            <button class="ghost" data-hotkey="copy">복사</button>
+            <button class="ghost" data-hotkey="paste">붙여넣기</button>
+            <button class="ghost" id="rightClick">우클릭</button>
+            <button class="ghost" id="scrollUp">▲ 스크롤</button>
+            <button class="ghost" id="scrollDown">▼ 스크롤</button>
+          </div>
+        </section>
+        <section class="section">
+          <h2>휴대폰에서 글자 입력</h2>
+          <textarea id="textValue" maxlength="1000" placeholder="컴퓨터에 입력할 글자를 적으세요. 한글도 지원합니다."></textarea>
+          <button class="primary full" id="sendText">글자 입력하기</button>
+          <p class="muted" style="font-size:11px;line-height:1.6">텍스트 전송 시 원격 컴퓨터의 클립보드 내용이 바뀝니다.</p>
+        </section>
+        <section class="section" style="font-size:12px;color:#a4b4d0;line-height:1.7">안전하게 사용하기<br>PC 앞에서 언제든 <strong style="color:#e2e8f0">즉시 중지</strong>를 누를 수 있습니다. 알 수 없는 사람에게 접속 코드를 알려주지 마세요.</section>
+      </aside>
+    </div>
+    <div class="foot">YEON 원격 조정 v1.0.1 · 같은 네트워크에서만 사용 · 인터넷 공개/자동 접속 없음</div>
+  </div>
+  <div id="toast" role="status"></div>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let connected=false, frameTimer=null, statusTimer=null, lastPointer={x:0.5,y:0.5};
+  let frameErrors=0, pressedButton=null, previousMove=0;
+  const img=$('frame');
+  const translations={Control:'ctrl',Alt:'alt',Shift:'shift',Meta:'win',Escape:'esc',Enter:'enter',Backspace:'backspace',Delete:'delete',Tab:'tab',ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down', ' ':'space',CapsLock:'capslock',PageUp:'pgup',PageDown:'pgdn',Home:'home',End:'end',Insert:'insert'};
+  const keymap = key => translations[key] || (key.length===1 ? key.toLowerCase() : key.toLowerCase());
+
+  function toast(msg){const t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>{t.style.display='none'},2700)}
+  async function request(path, data){
+    const res=await fetch(path,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    let payload={};try{payload=await res.json()}catch(_){}
+    if(res.status===401 && path!=='/api/login'){leave();throw new Error('인증이 만료되었습니다.')}
+    if(!res.ok)throw new Error(payload.error||`요청 실패 (${res.status})`);
+    return payload;
+  }
+  async function action(data){if(!connected)return;try{await request('/api/action',data)}catch(e){toast(e.message)}}
+  function stopFrame(){if(frameTimer)clearTimeout(frameTimer);frameTimer=null;img.removeAttribute('src')}
+  function leave(){connected=false;stopFrame();if(statusTimer)clearInterval(statusTimer);statusTimer=null;$('loginView').classList.remove('hidden');$('appView').classList.add('hidden');$('pin').value=''}
+  async function begin(){
+    try{
+      const res=await fetch('/api/status',{credentials:'same-origin',cache:'no-store'});
+      if(!res.ok){leave();return}
+      const info=await res.json();
+      $('resolution').textContent=`(${info.width} × ${info.height})`;
+      $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');
+      connected=true;frameErrors=0;nextFrame();
+      if(statusTimer)clearInterval(statusTimer);
+      statusTimer=setInterval(async()=>{
+        if(!connected)return;
+        try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)leave()}
+        catch(e){$('connectionStatus').textContent='연결 확인 중';}
+      },4000);
+    }catch(e){leave();$('loginError').textContent='연결할 수 없습니다. PC에서 공유 중인지 확인하세요.'}
+  }
+  function nextFrame(){
+    if(!connected)return;
+    frameTimer=setTimeout(()=>{if(connected)img.src='/api/frame?_='+Date.now()},180);
+  }
+  img.addEventListener('load',()=>{frameErrors=0;$('placeholder').classList.add('hidden');$('frameInfo').textContent='실시간';nextFrame()});
+  img.addEventListener('error',()=>{
+    if(!connected)return;
+    frameErrors++;
+    $('frameInfo').textContent='화면 연결 확인 중';
+    if(frameErrors>8){leave();return}
+    frameTimer=setTimeout(()=>{if(connected)img.src='/api/frame?_='+Date.now()},850);
+  });
+
+  $('loginForm').addEventListener('submit',async e=>{
+    e.preventDefault();const btn=$('loginButton');btn.disabled=true;$('loginError').textContent='';
+    try{await request('/api/login',{pin:$('pin').value.trim()});await begin()}
+    catch(err){$('loginError').textContent=err.message}
+    finally{btn.disabled=false}
+  });
+  $('disconnect').addEventListener('click',async()=>{try{await request('/api/logout',{})}catch(e){}leave()});
+  document.querySelectorAll('[data-hotkey]').forEach(b=>b.addEventListener('click',()=>action({type:'hotkey',name:b.dataset.hotkey})));
+  $('sendText').addEventListener('click',async()=>{const box=$('textValue');if(!box.value)return;await action({type:'text',text:box.value});box.value='';toast('글자를 전송했습니다.')});
+  $('rightClick').addEventListener('click',()=>{action({...lastPointer,type:'down',button:'right'});setTimeout(()=>action({...lastPointer,type:'up',button:'right'}),95)});
+  $('scrollUp').addEventListener('click',()=>action({type:'scroll',amount:3}));
+  $('scrollDown').addEventListener('click',()=>action({type:'scroll',amount:-3}));
+
+  function point(e){
+    const r=img.getBoundingClientRect();const nw=img.naturalWidth, nh=img.naturalHeight;
+    if(!nw||!nh||!r.width||!r.height)return null;
+    const s=Math.min(r.width/nw,r.height/nh);const w=nw*s,h=nh*s;
+    const x=(e.clientX-(r.left+(r.width-w)/2))/w, y=(e.clientY-(r.top+(r.height-h)/2))/h;
+    if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+    return {x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y))};
+  }
+  img.addEventListener('pointerdown',e=>{
+    if(!connected)return;e.preventDefault();const p=point(e);if(!p)return;
+    lastPointer=p;pressedButton=e.button===2?'right':e.button===1?'middle':'left';
+    try{img.setPointerCapture(e.pointerId)}catch(_){}
+    action({...p,type:'down',button:pressedButton});
+  });
+  img.addEventListener('pointermove',e=>{
+    if(!connected)return;const p=point(e);if(!p)return;lastPointer=p;
+    const now=performance.now();if(now-previousMove<55)return;previousMove=now;
+    action({...p,type:'move'});
+  });
+  function finishPointer(e){if(!connected||!pressedButton)return;const p=point(e)||lastPointer;action({...p,type:'up',button:pressedButton});pressedButton=null}
+  img.addEventListener('pointerup',finishPointer);
+  img.addEventListener('pointercancel',finishPointer);
+  img.addEventListener('lostpointercapture',finishPointer);
+  img.addEventListener('contextmenu',e=>e.preventDefault());
+  $('screen').addEventListener('wheel',e=>{if(!connected)return;e.preventDefault();action({type:'scroll',amount:e.deltaY>0?-3:3})},{passive:false});
+  document.addEventListener('keydown',e=>{
+    if(!connected||e.repeat||e.isComposing||e.key==='Process'||e.target.closest('input,textarea,button,select'))return;
+    e.preventDefault();action({type:'keyDown',key:keymap(e.key)});
+  });
+  document.addEventListener('keyup',e=>{
+    if(!connected||e.isComposing||e.target.closest('input,textarea,button,select'))return;
+    e.preventDefault();action({type:'keyUp',key:keymap(e.key)});
+  });
+  window.addEventListener('blur',()=>{if(pressedButton){action({...lastPointer,type:'up',button:pressedButton});pressedButton=null}});
+  begin();
+})();
+</script>
+</body>
+</html>

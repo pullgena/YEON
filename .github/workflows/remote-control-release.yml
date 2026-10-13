@@ -1,0 +1,69 @@
+name: YEON 원격 조정 Windows Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'remote-control/**'
+      - '.github/workflows/remote-control-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: remote-control
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: remote-control/requirements.txt
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Check Python source syntax
+        shell: pwsh
+        run: |
+          python -m compileall -q .
+      - name: Verify remote control API tests
+        shell: pwsh
+        run: |
+          python -m unittest discover -s tests -v
+      - name: Build single-file Windows app
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --windowed --name "YEON-원격-조정" --add-data "web/index.html;web" app.py
+          if (!(Test-Path dist/YEON-원격-조정.exe)) { throw "EXE was not produced" }
+      - name: Upload build artifact (available even when release publishing fails)
+        uses: actions/upload-artifact@v4
+        with:
+          name: YEON-Remote-Control-Windows-v1.0.1
+          path: remote-control/dist/YEON-원격-조정.exe
+          if-no-files-found: error
+      - name: Create or update remote control release
+        continue-on-error: true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: remote-v1.0.1
+          name: YEON 원격 조정 v1.0.1 - Windows
+          target_commitish: ${{ github.sha }}
+          overwrite_files: true
+          make_latest: false
+          body: |
+            YEON 원격 조정 v1.0.1
+            YEON 원격 조정(관리받는 PC에서 사용하는 공유 앱). Windows PC에 실행하고 '공유 시작'을 누른 뒤 같은 Wi-Fi의 휴대폰/PC 웹 브라우저에서 화면을 원격 조종합니다.
+            8자리 접속 코드 필요. 같은 LAN에서만 사용하도록 설계되었으며 HTTP는 암호화되지 않습니다.
+            관리하는 사람은 다른 PC나 휴대폰의 브라우저에서 접속합니다.
+            별도 관리받는 사람용 앱은 추후 제작 예정이며 현재 릴리스에 포함되지 않습니다.
+            실행 파일: YEON-원격-조정.exe
+          files: remote-control/dist/YEON-원격-조정.exe
