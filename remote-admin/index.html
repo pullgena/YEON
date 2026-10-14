@@ -8,7 +8,7 @@
 :root{color-scheme:dark;font-family:'Malgun Gothic','Segoe UI',sans-serif}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 85% 0%,#303c74 0%,transparent 45%),#0c1221;color:#f0f4ff}
-main{max-width:750px;margin:0 auto;padding:36px 30px;min-width:0}.workspace{display:flex;min-height:100vh}.pc-sidebar{width:246px;flex:0 0 246px;background:#101a2c;border-right:1px solid #283754;padding:24px 14px}.sidebar-title{font-size:14px;font-weight:800;color:#eef2ff}.sidebar-sub{font-size:11px;color:#a2b2cb;line-height:1.55;margin:9px 0 17px}.pc-list{display:flex;flex-direction:column;gap:8px}.pc-item{border:1px solid #33445e;border-radius:12px;padding:6px;background:#18253c;display:flex;align-items:center;gap:2px}.pc-item.active{border-color:#818cf8;background:#252e56}.pc-item button{min-width:0}.pc-select{flex:1;text-align:left;overflow:hidden;background:none;border:0;color:#eef2ff;padding:9px 6px;font-size:12px}.pc-name{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-address{display:block;font-size:10px;color:#a6b4cc;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-remove{flex:none;border:0;background:#30405c;color:#d1dcf3;padding:6px 8px;font-size:12px}.pc-empty{font-size:12px;color:#91a4c1;line-height:1.6}@media(max-width:790px){.workspace{display:block}.pc-sidebar{width:100%;padding:14px 20px;border-bottom:1px solid #283754}.pc-list{flex-direction:row;overflow-x:auto}.pc-item{min-width:165px}main{padding:20px 18px}}
+main{max-width:750px;margin:0 auto;padding:36px 30px;min-width:0}.workspace{display:flex;min-height:100vh}.pc-sidebar{width:470px;flex:0 0 470px;display:grid;grid-template-columns:190px minmax(0,1fr);align-content:start;gap:12px;background:#101a2c;border-right:1px solid #283754;padding:24px 14px}.sidebar-actions{min-width:0}.sidebar-actions h2{color:#eef2ff;font-size:14px;margin:0 0 12px}.sidebar-action{display:block;width:100%;text-align:left;padding:13px 11px;margin-bottom:9px;border:1px solid #405276;border-radius:12px;background:#243759;color:#e8efff;font-size:13px;line-height:1.5}.sidebar-action:hover{background:#344d77}.sidebar-action:disabled{opacity:.5}.sidebar-computers{min-width:0;border-left:1px solid #34435e;padding-left:12px}.sidebar-title{font-size:14px;font-weight:800;color:#eef2ff}.sidebar-sub{font-size:11px;color:#a2b2cb;line-height:1.55;margin:9px 0 17px}.pc-list{display:flex;flex-direction:column;gap:8px}.pc-item{border:1px solid #33445e;border-radius:12px;padding:6px;background:#18253c;display:flex;align-items:center;gap:2px}.pc-item.active{border-color:#818cf8;background:#252e56}.pc-item button{min-width:0}.pc-select{flex:1;text-align:left;overflow:hidden;background:none;border:0;color:#eef2ff;padding:9px 6px;font-size:12px}.pc-name{display:block;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-address{display:block;font-size:10px;color:#a6b4cc;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-remove{flex:none;border:0;background:#30405c;color:#d1dcf3;padding:6px 8px;font-size:12px}.pc-empty{font-size:12px;color:#91a4c1;line-height:1.6}@media(max-width:1000px){.workspace{display:block}.pc-sidebar{width:100%;grid-template-columns:215px 1fr;padding:14px 20px;border-bottom:1px solid #283754}.pc-list{flex-direction:row;overflow-x:auto}.pc-item{min-width:175px}main{padding:20px 18px}}
 .brand{color:#a5b4fc;letter-spacing:.22em;font-size:12px;font-weight:900}
 h1{font-size:34px;letter-spacing:-1.2px;margin:20px 0 8px}h1 span{color:#a5b4fc}
 .subtitle{color:#acb7d1;line-height:1.8;font-size:14px;margin:0 0 30px}
@@ -33,15 +33,23 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 </head>
 <body>
 <div class="workspace">
-<aside class="pc-sidebar" aria-label="연결된 컴퓨터 목록">
+<aside class="pc-sidebar" aria-label="관리자 기능과 연결된 컴퓨터">
+  <div class="sidebar-actions" aria-label="관리자 기능">
+    <h2>관리 기능</h2>
+    <button type="button" id="sendFile" class="sidebar-action">📤 파일 보내기</button>
+    <button type="button" id="requestFile" class="sidebar-action">📩 파일을 보내라고 명령하기</button>
+    <p class="sidebar-sub">파일은 관리 대상 PC에서 직접 승인하거나 선택합니다. 한 번에 최대 8MB입니다.</p>
+  </div>
+  <div class="sidebar-computers">
   <div class="sidebar-title">▣ 내 컴퓨터 목록</div>
   <p class="sidebar-sub">연결했던 PC를 선택하면 해당 원격 화면이 열립니다. 이름은 코드 인증 후 자동으로 표시됩니다.</p>
   <div id="computerList" class="pc-list" aria-live="polite"><p class="pc-empty">등록된 컴퓨터가 없습니다.</p></div>
+  </div>
 </aside>
 <main>
 <div class="brand">YEON · REMOTE ADMIN</div>
 <h1>YEON <span>원격 조정</span></h1>
-<p class="subtitle">관리자 전용 프로그램 v1.3.5<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
+<p class="subtitle">관리자 전용 프로그램 v1.3.6<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
 <section class="card">
 <h2 class="card-title">관리 대상 컴퓨터 연결</h2>
 <form id="connectForm">
@@ -120,6 +128,18 @@ $('connectForm').addEventListener('submit',async event=>{
   finally{$('connect').disabled=false;}
 });
 $('disconnect').addEventListener('click',()=>window.yeonAdmin.disconnect());
+async function runFileAction(buttonId, action) {
+  $('error').textContent='';
+  const btn=$(buttonId);btn.disabled=true;
+  try {
+    const result=await action();
+    if (!result.ok && !result.canceled) $('error').textContent=result.error||'파일 교환에 실패했습니다.';
+  } catch { $('error').textContent='파일 작업을 완료하지 못했습니다.'; }
+  finally {btn.disabled=false;}
+}
+$('sendFile').addEventListener('click',()=>runFileAction('sendFile',()=>window.yeonAdmin.sendFile()));
+$('requestFile').addEventListener('click',()=>runFileAction('requestFile',()=>window.yeonAdmin.requestFile()));
+
 $('broadcastStart').addEventListener('click',async()=>{
   $('error').textContent=''; const r=await window.yeonAdmin.broadcastStart();
   if(!r.ok)$('error').textContent=r.error||'일반 화면 전송을 시작할 수 없습니다.';

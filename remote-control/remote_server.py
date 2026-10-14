@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from focus_mode import FocusSession
+from file_exchange import FileExchange, MAX_FILE
 
 PIN_TTL_SECONDS = 60 * 60
 MAX_BODY = 8 * 1024
@@ -37,6 +38,7 @@ class ShareState:
         self.lock = threading.RLock()
         self.active = True
         self.focus = FocusSession()
+        self.files = FileExchange()
         # Each authenticated administrator session starts in screen-only mode.
         self.remote_permissions: dict[str, bool] = {}
 
@@ -112,6 +114,7 @@ class ShareState:
                     if callable(release): release()
             if self.focus.owner == token:
                 self.focus.stop()
+            self.files.revoke(token)
 
     def end(self) -> None:
         with self.lock:
@@ -122,6 +125,7 @@ class ShareState:
             if callable(release):
                 release()
             self.focus.stop()
+            self.files.close()
 
     def connections(self) -> int:
         now = time.monotonic()
@@ -152,7 +156,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.5"
+    server_version = "YEONManaged/1.3.6"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -232,6 +236,26 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 return
             self._json(HTTPStatus.OK, {"mode": self.server.state.focus.status(token),
                                        "displayMode": self.server.state.focus.display()})
+        elif path == "/api/files/status":
+            token = self._token()
+            if not self.server.state.authenticated(token):
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "로그인이 필요합니다."})
+                return
+            key = __import__('urllib.parse', fromlist=['parse_qs']).parse_qs(urlsplit(self.path).query).get('id', [''])[0]
+            info = self.server.state.files.status(key, token)
+            self._json(HTTPStatus.OK, info) if info else self._json(HTTPStatus.NOT_FOUND, {"error": "파일 요청을 찾을 수 없습니다."})
+        elif path == "/api/files/download":
+            token = self._token()
+            if not self.server.state.authenticated(token):
+                self._json(HTTPStatus.UNAUTHORIZED, {"error": "로그인이 필요합니다."})
+                return
+            key = __import__('urllib.parse', fromlist=['parse_qs']).parse_qs(urlsplit(self.path).query).get('id', [''])[0]
+            result = self.server.state.files.download(key, token)
+            if result is None:
+                self._json(HTTPStatus.CONFLICT, {"error": "관리 대상이 파일을 선택하지 않았습니다."})
+                return
+            filename, data = result
+            self._write(HTTPStatus.OK, data, "application/octet-stream")
         elif path == "/api/frame":
             if not self.server.state.authenticated(self._token()):
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
@@ -274,6 +298,31 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 return
             self._json(HTTPStatus.OK, {"ok": True})
             return
+        if path == '/api/files/upload':
+            token = self._token()
+            if not self.server.state.authenticated(token):
+                self._json(HTTPStatus.UNAUTHORIZED, {'error': '로그인이 필요합니다.'})
+                return
+            if self.headers.get('Content-Type', '').split(';')[0].strip().lower() != 'application/octet-stream':
+                self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {'error': '바이너리 전송만 허용합니다.'})
+                return
+            try: length = int(self.headers.get('Content-Length', '0'))
+            except ValueError: length = 0
+            if not 1 <= length <= MAX_FILE:
+                self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {'error': '8MB 초과 파일은 전송할 수 없습니다.'})
+                return
+            from urllib.parse import parse_qs
+            key = parse_qs(urlsplit(self.path).query).get('id', [''])[0]
+            # Only read after local approval and before applying the finite byte cap.
+            info = self.server.state.files.status(key, token)
+            if not info or info['state'] != 'approved' or info['size'] != length:
+                self._json(HTTPStatus.CONFLICT, {'error': '관리 대상 PC에서 파일 저장을 먼저 허용해야 합니다.'})
+                return
+            if not self.server.state.files.accept_bytes(key, token, self.rfile.read(length)):
+                self._json(HTTPStatus.CONFLICT, {'error': '파일 저장에 실패했거나 요청이 취소되었습니다.'})
+                return
+            self._json(HTTPStatus.OK, {'ok': True})
+            return
         if self.headers.get("Content-Type", "").split(";")[0].strip().lower() != "application/json":
             self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "JSON 형식만 허용합니다."})
             return
@@ -306,7 +355,17 @@ class RemoteHandler(BaseHTTPRequestHandler):
         if not self.server.state.authenticated(token):
             self._json(HTTPStatus.UNAUTHORIZED, {"error": "로그인이 필요합니다."})
             return
-        if path == "/api/focus/request":
+        if path == "/api/files/offer":
+            try:
+                key = self.server.state.files.offer(token, data.get('filename'), data.get('size'))
+            except ValueError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {'error': str(exc)})
+                return
+            self._json(HTTPStatus.OK, {'id': key})
+        elif path == "/api/files/request":
+            key = self.server.state.files.request(token)
+            self._json(HTTPStatus.OK, {'id': key})
+        elif path == "/api/focus/request":
             display_mode = data.get('displayMode', 'focus')
             if display_mode not in ('focus', 'window'):
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "지원하지 않는 화면 전송 모드입니다."})

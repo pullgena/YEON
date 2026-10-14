@@ -7,7 +7,7 @@ import sys
 import threading
 import tkinter as tk
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import messagebox, ttk, filedialog
 
 from remote_server import RemoteHTTPServer
 from tray_visual import VERSION, make_tray_icon, status_title
@@ -228,6 +228,7 @@ class ManagedDesktopApp:
             return
         if self.server:
             self.status.set(f"● 공유 중 · 원격 제어 허용 세션 {self.server.state.enabled_sessions()}개 · 연결된 기기 {self.server.state.connections()}개")
+            self.check_file_requests()
             focus = self.server.state.focus
             if focus.pending() and not self.focus_prompt_open:
                 self.focus_prompt_open = True
@@ -237,6 +238,37 @@ class ManagedDesktopApp:
                 self.focus_overlay = None
         self._refresh_tray()
         self.root.after(650, self.refresh_status)
+
+    def check_file_requests(self):
+        """All OS file dialogs run on the local managed user's Tk event loop."""
+        if not self.server:
+            return
+        item = self.server.state.files.next_prompt()
+        if not item:
+            return
+        key, kind, filename, size = item
+        exchange = self.server.state.files
+        self.show_window()
+        if kind == 'receive':
+            allowed = messagebox.askyesno(
+                'YEON 파일 수신 요청',
+                f'관리자가 파일을 보내려고 합니다.\n\n파일: {filename}\n크기: {size:,} bytes\n\n이 PC에 저장하시겠습니까?',
+                parent=self.root)
+            destination = (filedialog.asksaveasfilename(parent=self.root,
+                title='수신 파일 저장 위치 선택', initialfile=filename)
+                if allowed and self.server else '')
+            exchange.decision(key, destination)
+        else:
+            allowed = messagebox.askyesno(
+                'YEON 파일 제출 요청',
+                '관리자가 파일 제출을 요청했습니다.\n\n보낼 파일을 직접 선택하시겠습니까?\n'
+                '선택한 파일 1개만 관리자에게 전송됩니다. (최대 8MB)',
+                parent=self.root)
+            source = (filedialog.askopenfilename(parent=self.root,
+                title='관리자에게 제출할 파일 선택') if allowed and self.server else '')
+            ok = exchange.decision(key, source)
+            if source and not ok:
+                messagebox.showwarning('파일 제출 불가', '최대 8MB 파일만 제출할 수 있습니다.', parent=self.root)
 
     def ask_focus_permission(self):
         try:

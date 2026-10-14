@@ -1,12 +1,13 @@
 'use strict';
-const {app, BrowserWindow, ipcMain, Menu, Tray, session, desktopCapturer} = require('electron');
+const {app, BrowserWindow, ipcMain, Menu, Tray, session, dialog, desktopCapturer} = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const {parseTarget} = require('./target');
 const {cleanList, remember, forget} = require('./computers');
 const {FocusSender, send, cookieForSession} = require('./focus_transport');
+const {sendFile,requestFile} = require('./file_transfer');
 
-const VERSION = '1.3.5';
+const VERSION = '1.3.6';
 let dashboard = null;
 let remote = null;
 let tray = null;
@@ -15,6 +16,7 @@ let status = '대기 중';
 let focusSender = null;
 let quitting = false;
 let computers = [];
+let fileOperationRunning = false;
 
 function configPath() {return path.join(app.getPath('userData'), 'managed-computers.json');}
 function loadComputers() {
@@ -242,6 +244,22 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('yeon-admin:disconnect',event=>{
       if(!valid(event))return {ok:false};closeRemote();updateTrayMenu();return {ok:true};
     });
+    async function startFileOperation(event, operation) {
+      if (!valid(event)) return {ok:false,error:'잘못된 요청입니다.'};
+      if (!currentAddress) return {ok:false,error:'먼저 파일을 주고받을 대상 PC를 선택하세요.'};
+      if (fileOperationRunning) return {ok:false,error:'이미 파일 작업이 진행 중입니다.'};
+      const address = currentAddress;
+      fileOperationRunning = true;
+      try {
+        const opts = {electronSession:session.defaultSession,address,dialog,parent:dashboard,
+          report:message => setStatus(message)};
+        const result = await operation(opts);
+        return result.ok ? {ok:true} : {ok:false,canceled:true};
+      } catch (err) {setStatus(`파일 작업 실패 · ${err.message}`);return {ok:false,error:err.message};}
+      finally {fileOperationRunning = false;}
+    }
+    ipcMain.handle('yeon-admin:file-send',event=>startFileOperation(event,sendFile));
+    ipcMain.handle('yeon-admin:file-request',event=>startFileOperation(event,requestFile));
     ipcMain.handle('yeon-admin:computers',event=>valid(event)?computers:[]);
     ipcMain.handle('yeon-admin:computer-remove',(event,address)=>{
       if(!valid(event))return {ok:false};

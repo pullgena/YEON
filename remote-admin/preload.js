@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('yeonAdmin', Object.freeze({
   remoteMode: () => ipcRenderer.invoke('yeon-admin:remote-mode'),
   controlPermission: () => ipcRenderer.invoke('yeon-admin:control-permission'),
   controlSet: enabled => ipcRenderer.invoke('yeon-admin:control-set', enabled),
+  sendFile: () => ipcRenderer.invoke('yeon-admin:file-send'),
+  requestFile: () => ipcRenderer.invoke('yeon-admin:file-request'),
   getComputers: () => ipcRenderer.invoke('yeon-admin:computers'),
   removeComputer: address => ipcRenderer.invoke('yeon-admin:computer-remove', address),
   getStatus: () => ipcRenderer.invoke('yeon-admin:status'),
