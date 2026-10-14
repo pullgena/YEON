@@ -73,6 +73,16 @@ class APITests(unittest.TestCase):
         code, _, _ = self.connect('GET', '/api/frame', cookie=token)
         self.assertEqual(code, 401)
 
+    def test_computer_name_visible_only_after_login(self):
+        import socket
+        code, _, _ = self.connect('GET', '/api/status')
+        self.assertEqual(code, 401)
+        code, _, cookie = self.connect('POST', '/api/login', {'pin': self.srv.state.pin})
+        self.assertEqual(code, 200)
+        code, raw, _ = self.connect('GET', '/api/status', cookie=cookie.split(';')[0])
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(raw)['computerName'], socket.gethostname()[:64])
+
     def test_origin_rejected(self):
         code, _, _ = self.connect('POST', '/api/login', {'pin': self.srv.state.pin}, origin=False)
         self.assertEqual(code, 403)

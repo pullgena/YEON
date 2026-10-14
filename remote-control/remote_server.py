@@ -9,6 +9,7 @@ import hmac
 import ipaddress
 import json
 import secrets
+import socket
 import threading
 import time
 from collections import defaultdict, deque
@@ -151,7 +152,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.2"
+    server_version = "YEONManaged/1.3.4"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -221,7 +222,7 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 return
             try:
                 w, h = self.server.state.controller.screen_size()
-                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h, "remoteControlEnabled": self.server.state.can_remote_control(self._token())})
+                self._json(HTTPStatus.OK, {"authorized": True, "width": w, "height": h, "remoteControlEnabled": self.server.state.can_remote_control(self._token()), "computerName": socket.gethostname()[:64]})
             except Exception:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "화면 크기를 읽을 수 없습니다."})
         elif path == "/api/focus/status":
