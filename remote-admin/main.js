@@ -6,7 +6,7 @@ const {parseTarget} = require('./target');
 const {cleanList, remember, forget} = require('./computers');
 const {FocusSender, send, cookieForSession} = require('./focus_transport');
 
-const VERSION = '1.3.4';
+const VERSION = '1.3.5';
 let dashboard = null;
 let remote = null;
 let tray = null;
@@ -136,7 +136,7 @@ function updateTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'관리자 창 열기',click:showDashboard},
     {label:'연결된 컴퓨터 화면 열기',enabled:!!currentAddress,click:showRemote},
-    {label:'집중 화면 전송 중지',enabled:!!focusSender?.active,click:()=>{void focusSender.stop();}},
+    {label:'화면 전송 중지',enabled:!!focusSender?.active,click:()=>{void focusSender.stop();}},
     {label:'현재 원격 연결 종료',enabled:!!currentAddress,click:closeRemote},
     {type:'separator'},
     {label:'YEON 원격 조정 완전 종료',click:quitApp}
@@ -181,16 +181,27 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle('yeon-admin:focus-start',async event => {
       if (!valid(event)) return {ok:false,error:'잘못된 요청입니다.'};
       if (!currentAddress) return {ok:false,error:'먼저 대상 PC에 연결하세요.'};
-      if (focusSender.active) return {ok:false,error:'이미 집중 화면 전송 중입니다.'};
+      if (focusSender.active) return {ok:false,error:'이미 화면 전송 중입니다.'};
       const address = currentAddress;
-      void focusSender.start(address).catch(error => setStatus(`집중 모드: ${error.message}`))
+      void focusSender.start(address, 'focus').catch(error => setStatus(`집중 모드: ${error.message}`))
+        .finally(updateTrayMenu);
+      updateTrayMenu();
+      return {ok:true};
+    });
+    ipcMain.handle('yeon-admin:broadcast-start',async event => {
+      if (!valid(event)) return {ok:false,error:'잘못된 요청입니다.'};
+      if (!currentAddress) return {ok:false,error:'먼저 대상 PC에 연결하세요.'};
+      if (focusSender.active) return {ok:false,error:'먼저 진행 중인 화면 전송을 종료하세요.'};
+      const address = currentAddress;
+      void focusSender.start(address, 'window')
+        .catch(error => setStatus(`일반 화면 전송: ${error.message}`))
         .finally(updateTrayMenu);
       updateTrayMenu();
       return {ok:true};
     });
     ipcMain.handle('yeon-admin:focus-stop',async event => {
       if (!valid(event)) return {ok:false};
-      await focusSender.stop();setStatus('집중 화면 전송 종료됨');updateTrayMenu();return {ok:true};
+      await focusSender.stop();setStatus('화면 전송 종료됨');updateTrayMenu();return {ok:true};
     });
     ipcMain.handle('yeon-admin:control-permission',async event => {
       if (!valid(event) || !currentAddress) return {ok:false};
@@ -210,7 +221,7 @@ if (!app.requestSingleInstanceLock()) {
         });
         setStatus(enabled?'원격 제어 ON · 마우스·키보드 사용 가능':'원격 제어 OFF · 화면만 보기');
         return {ok:true,enabled:info.remoteControlEnabled===true};
-      } catch(error){return {ok:false,error:error.message};}
+      } catch(error){return {ok:false,error:`원격 제어 설정 실패: ${error.message}. 먼저 제어 창에서 8자리 코드로 로그인했는지 확인하세요.`};}
     });
     ipcMain.handle('yeon-admin:remote-mode',async event=>{
       if(!valid(event))return {ok:false};

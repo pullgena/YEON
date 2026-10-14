@@ -244,15 +244,19 @@ class ManagedDesktopApp:
                 return
             # This prompt is shown on the managed PC even when its main window was hidden.
             self.show_window()
-            approved = messagebox.askyesno(
-                'YEON 집중 화면 전송 승인',
-                '관리자가 자신의 화면을 이 PC에 전체 화면으로 전송하려고 합니다.\n\n'
-                '승인하면 일반 데스크톱 조작이 전체 화면 안내로 가려집니다.\n'
-                'ESC 또는 화면 아래의 빨간 종료 버튼으로 언제든 중지할 수 있습니다.\n\n'
-                '집중 화면 전송을 허용하시겠습니까?', parent=self.root)
+            display_mode = self.server.state.focus.display()
+            focused = display_mode == 'focus'
+            title = 'YEON 집중 화면 전송 승인' if focused else 'YEON 일반 화면 전송 승인'
+            message = ('관리자가 자신의 화면을 이 PC에 전체 화면으로 전송하려고 합니다.\n\n'
+                       '전체 화면에서 다른 작업이 제한됩니다. ESC 또는 종료 버튼으로 해제할 수 있습니다.'
+                       if focused else
+                       '관리자가 자신의 화면을 이 PC에 일반 창으로 전송하려고 합니다.\n\n'
+                       '창을 이동하거나 다른 프로그램을 사용할 수 있습니다. ESC 또는 종료 버튼으로 끌 수 있습니다.')
+            approved = messagebox.askyesno(title, message + '\n\n전송을 허용하시겠습니까?', parent=self.root)
             if self.server and self.server.state.focus.pending():
                 if approved and self.server.state.focus.accept():
-                    self.focus_overlay = FocusOverlay(self.root, self.server.state.focus, self.focus_exited)
+                    self.focus_overlay = FocusOverlay(self.root, self.server.state.focus,
+                                                      self.focus_exited, fullscreen=focused)
                 else:
                     self.server.state.focus.deny()
         finally:
@@ -260,7 +264,7 @@ class ManagedDesktopApp:
 
     def focus_exited(self):
         self.focus_overlay = None
-        self.status.set('● 집중 화면이 관리 대상 PC에서 종료되었습니다.')
+        self.status.set('● 관리자 화면 전송이 관리 대상 PC에서 종료되었습니다.')
 
     def hide_window(self):
         if self.closing:

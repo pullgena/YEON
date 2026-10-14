@@ -152,7 +152,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.4"
+    server_version = "YEONManaged/1.3.5"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -230,7 +230,8 @@ class RemoteHandler(BaseHTTPRequestHandler):
             if not self.server.state.authenticated(token):
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
                 return
-            self._json(HTTPStatus.OK, {"mode": self.server.state.focus.status(token)})
+            self._json(HTTPStatus.OK, {"mode": self.server.state.focus.status(token),
+                                       "displayMode": self.server.state.focus.display()})
         elif path == "/api/frame":
             if not self.server.state.authenticated(self._token()):
                 self._json(HTTPStatus.UNAUTHORIZED, {"error": "인증 필요"})
@@ -269,7 +270,7 @@ class RemoteHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "화면 크기 초과"})
                 return
             if not self.server.state.focus.push(token, self.rfile.read(length)):
-                self._json(HTTPStatus.CONFLICT, {"error": "집중 모드 허용 필요"})
+                self._json(HTTPStatus.CONFLICT, {"error": "화면 전송 허용 필요"})
                 return
             self._json(HTTPStatus.OK, {"ok": True})
             return
@@ -306,8 +307,12 @@ class RemoteHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.UNAUTHORIZED, {"error": "로그인이 필요합니다."})
             return
         if path == "/api/focus/request":
-            if not self.server.state.focus.request(token):
-                self._json(HTTPStatus.CONFLICT, {"error": "이미 집중 화면 요청/전송이 진행 중입니다."})
+            display_mode = data.get('displayMode', 'focus')
+            if display_mode not in ('focus', 'window'):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "지원하지 않는 화면 전송 모드입니다."})
+                return
+            if not self.server.state.focus.request(token, display_mode):
+                self._json(HTTPStatus.CONFLICT, {"error": "이미 화면 전송 요청/전송이 진행 중입니다."})
                 return
             self._json(HTTPStatus.OK, {"mode": "pending"})
         elif path == "/api/focus/stop":
@@ -335,8 +340,16 @@ class RemoteHandler(BaseHTTPRequestHandler):
             except (ValueError, TypeError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
-            except Exception:
-                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "입력 조작에 실패했습니다."})
+            except Exception as exc:
+                # Fail-safe corner is deliberately *not* disabled. Report an actionable
+                # reason without exposing IPs, cookies, passwords or raw error internals.
+                if type(exc).__name__ == 'FailSafeException':
+                    detail = '관리 대상 PC의 마우스가 화면 모서리의 안전 정지 지점에 있습니다. 대상 PC에서 마우스를 중앙으로 이동한 뒤 다시 시도하세요.'
+                elif type(exc).__name__ in ('PermissionError', 'OSError'):
+                    detail = 'Windows에서 입력을 차단했습니다. 잠금·UAC 보안 화면을 닫고 일반 데스크톱에서 다시 시도하세요.'
+                else:
+                    detail = '마우스·키보드 입력에 실패했습니다. 관리 대상 PC의 화면 잠금, 권한 및 프로그램 상태를 확인하세요.'
+                self._json(HTTPStatus.SERVICE_UNAVAILABLE, {"error": detail})
                 return
             self._json(HTTPStatus.OK, {"ok": True})
         else:

@@ -83,7 +83,7 @@
         <section class="section" style="font-size:12px;color:#a4b4d0;line-height:1.7">안전하게 사용하기<br>PC 앞에서 언제든 <strong style="color:#e2e8f0">즉시 중지</strong>를 누를 수 있습니다. 알 수 없는 사람에게 접속 코드를 알려주지 마세요.</section>
       </aside>
     </div>
-    <div class="foot">YEON 관리 대상 v1.3.4 · 같은 네트워크에서만 사용 · 백그라운드 트레이 실행 지원</div>
+    <div class="foot">YEON 관리 대상 v1.3.5 · 같은 네트워크에서만 사용 · 백그라운드 트레이 실행 지원</div>
   </div>
   <div id="toast" role="status"></div>
 <script>
@@ -96,10 +96,24 @@
   const forwardedKeys=new Set();
   let keyboardQueue=Promise.resolve();
   function queueInput(data){
+    // One ordered stream: guarantees mousedown precedes mouseup and Ctrl+V
+    // happens after clipboard updates. Prevents sporadic failed clicks.
     keyboardQueue=keyboardQueue.catch(()=>{}).then(async()=>{
       if(!connected||!controlsEnabled)return;
-      try{await request('/api/action',data)}catch(err){toast(err.message)}
+      try{await request('/api/action',data)}catch(err){
+        toast(err.message);
+        if(/OFF|로그인|인증/.test(err.message))refreshPermission();
+      }
     });
+    return keyboardQueue;
+  }
+  async function refreshPermission(){
+    if(!connected)return;
+    try {
+      const r=await fetch('/api/status',{credentials:'same-origin',cache:'no-store'});
+      if(r.status===401){leave();return;}
+      if(r.ok){const info=await r.json();setControlPermission(info.remoteControlEnabled);}
+    }catch{}
   }
   function flushInput(){
     if(typingTimer)clearTimeout(typingTimer);typingTimer=null;
@@ -142,9 +156,9 @@
       forwardedKeys.clear();
     }
   }
-  async function action(data){
-    if(!connected||!controlsEnabled)return;
-    try{await request('/api/action',data)}catch(e){toast(e.message)}
+  function action(data){
+    if(!connected||!controlsEnabled)return Promise.resolve();
+    return queueInput(data);
   }
   function stopFrame(){if(frameTimer)clearTimeout(frameTimer);frameTimer=null;img.removeAttribute('src')}
   function leave(){connected=false;controlsEnabled=false;capture.blur();capture.value='';clearTimeout(typingTimer);forwardedKeys.clear();stopFrame();if(statusTimer)clearInterval(statusTimer);statusTimer=null;$('loginView').classList.remove('hidden');$('appView').classList.add('hidden');$('pin').value=''}
@@ -159,11 +173,7 @@
       $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');
       connected=true;frameErrors=0;nextFrame();
       if(statusTimer)clearInterval(statusTimer);
-      statusTimer=setInterval(async()=>{
-        if(!connected)return;
-        try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok){leave();return} const info=await r.json();setControlPermission(info.remoteControlEnabled);}
-        catch(e){$('connectionStatus').textContent='연결 확인 중';}
-      },4000);
+      statusTimer=setInterval(refreshPermission,1000);
     }catch(e){leave();$('loginError').textContent='연결할 수 없습니다. PC에서 공유 중인지 확인하세요.'}
   }
   function nextFrame(){
@@ -187,7 +197,7 @@
   });
   $('disconnect').addEventListener('click',async()=>{try{await request('/api/logout',{})}catch(e){}leave()});
   document.querySelectorAll('[data-hotkey]').forEach(b=>b.addEventListener('click',()=>action({type:'hotkey',name:b.dataset.hotkey})));
-  $('rightClick').addEventListener('click',()=>{action({...lastPointer,type:'down',button:'right'});setTimeout(()=>action({...lastPointer,type:'up',button:'right'}),95)});
+  $('rightClick').addEventListener('click',async()=>{await action({...lastPointer,type:'down',button:'right'});await action({...lastPointer,type:'up',button:'right'})});
   $('scrollUp').addEventListener('click',()=>action({type:'scroll',amount:3}));
   $('scrollDown').addEventListener('click',()=>action({type:'scroll',amount:-3}));
 

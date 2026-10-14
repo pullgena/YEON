@@ -50,17 +50,23 @@ class FocusSender {
     this.active = false;
     this.address = null;
     this.cookie = null;
+    this.generation = 0;
+    this.displayMode = 'focus';
   }
-  async start(address) {
+  async start(address, displayMode='focus') {
+    if (!['focus', 'window'].includes(displayMode)) throw new Error('지원하지 않는 전송 방식입니다.');
     if (this.active) throw new Error('이미 집중 화면 전송이 진행 중입니다.');
     const safe = parseTarget(address);
     const cookie = await cookieForSession(this.electronSession, safe);
     this.active = true;
+    const generation = ++this.generation;
+    this.displayMode = displayMode;
     this.address = safe;
     this.cookie = cookie;
     try {
-      await send(safe, '/api/focus/request', {cookie});
-      this.onStatus('관리 대상 PC의 집중 화면 전송 승인을 기다리는 중…');
+      await send(safe, '/api/focus/request', {cookie, bytes:Buffer.from(JSON.stringify({displayMode}))});
+      const label = displayMode === 'focus' ? '집중 화면 전송' : '일반 화면 전송';
+      this.onStatus(`관리 대상 PC의 ${label} 승인을 기다리는 중…`);
       let state = 'pending';
       for (let i = 0; i < 38 && this.active; i++) {
         await sleep(1000);
@@ -69,7 +75,7 @@ class FocusSender {
       }
       if (!this.active) return;
       if (state !== 'active') throw new Error('관리 대상 PC에서 승인하지 않았거나 시간이 만료되었습니다.');
-      this.onStatus('집중 화면 전송 중 · 대상 PC에서는 ESC로 종료할 수 있습니다.');
+      this.onStatus(`${label} 중 · 대상 PC에서는 ESC 또는 종료 버튼으로 중지할 수 있습니다.`);
       let consecutiveErrors = 0;
       while (this.active) {
         try {
@@ -86,18 +92,23 @@ class FocusSender {
         await sleep(320);
       }
     } catch (error) {
-      if (this.active) this.onStatus(`집중 화면 전송 종료 · ${error.message}`);
+      if (this.active && generation === this.generation) this.onStatus(`화면 전송 종료 · ${error.message}`);
       throw error;
     } finally {
-      this.active = false;
-      this.address = null;
-      this.cookie = null;
-      try {await send(safe, '/api/focus/stop', {cookie});} catch {}
+      if (generation === this.generation) {
+        this.active = false;
+        this.address = null;
+        this.cookie = null;
+        try {await send(safe, '/api/focus/stop', {cookie});} catch {}
+      }
     }
   }
   async stop() {
     const {active,address,cookie} = this;
     this.active = false;
+    this.generation++;
+    this.address = null;
+    this.cookie = null;
     if (active && address && cookie) {
       try {await send(address, '/api/focus/stop', {cookie});} catch {}
     }

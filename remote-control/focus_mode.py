@@ -18,22 +18,30 @@ class FocusSession:
     def __init__(self):
         self.lock = threading.RLock()
         self.mode = 'idle'  # idle, pending, active, denied
+        self.display_mode = 'focus'  # focus: fullscreen lock; window: ordinary screen sharing
         self.owner = None
         self.requested_at = 0.0
         self.frame = None
         self.frame_seq = 0
         self.last_frame = 0.0
 
-    def request(self, token):
+    def request(self, token, display_mode='focus'):
+        if display_mode not in ('focus', 'window'):
+            return False
         with self.lock:
             if self.mode in ('pending', 'active'):
                 return False
             self.mode = 'pending'
+            self.display_mode = display_mode
             self.owner = token
             self.requested_at = time.monotonic()
             self.frame = None
             self.frame_seq = 0
             return True
+
+    def display(self):
+        with self.lock:
+            return self.display_mode
 
     def pending(self):
         with self.lock:
@@ -139,15 +147,21 @@ class FocusOverlay:
     The overlay intercepts clicks so the underlying desktop cannot be operated.
     The cursor is *not* trapped by OS hooks: a local ESC escape must remain safe.
     """
-    def __init__(self, root, session: FocusSession, on_stop):
+    def __init__(self, root, session: FocusSession, on_stop, fullscreen=True):
         self.root = root
         self.session = session
         self.on_stop = on_stop
+        self.fullscreen = fullscreen
         self.window = tk.Toplevel(root)
-        self.window.title('YEON 집중 화면 전송 · ESC 종료')
+        self.window.title('YEON 집중 화면 전송 · ESC 종료' if fullscreen else 'YEON 일반 화면 전송')
         self.window.configure(bg='#070b1b')
-        self.window.attributes('-fullscreen', True)
-        self.window.attributes('-topmost', True)
+        if fullscreen:
+            self.window.attributes('-fullscreen', True)
+            self.window.attributes('-topmost', True)
+        else:
+            self.window.geometry('960x620')
+            self.window.minsize(500, 320)
+            self.window.resizable(True, True)
         self.window.protocol('WM_DELETE_WINDOW', self.stop)
         self.window.bind('<Escape>', self.stop)
         self.window.bind('<Control-Shift-q>', self.stop)
@@ -160,20 +174,23 @@ class FocusOverlay:
         self.content.pack(fill='both', expand=True)
         toolbar = tk.Frame(self.window, bg='#182039')
         toolbar.pack(fill='x', side='bottom')
-        tk.Label(toolbar, text='YEON 집중 화면 전송 · 화면을 보는 동안 다른 작업이 제한됩니다',
+        tk.Label(toolbar, text=('YEON 집중 화면 전송 · 화면을 보는 동안 다른 작업이 제한됩니다' if fullscreen
+                                else 'YEON 일반 화면 전송 · 창 이동 및 다른 프로그램 사용 가능'),
                  fg='white', bg='#182039', padx=15, pady=12).pack(side='left')
-        stop_button = tk.Button(toolbar, text='집중 화면 종료 (ESC)', command=self.stop,
+        stop_button = tk.Button(toolbar, text='전송 종료 (ESC)', command=self.stop,
                   bg='#b91c1c', fg='white', relief='flat', padx=18, pady=10)
         stop_button.pack(side='right', padx=12)
         self.window.focus_force()
         self.window.update_idletasks()
-        self.cursor_guard.lock_to_button(stop_button)
+        if fullscreen:
+            self.cursor_guard.lock_to_button(stop_button)
         self.poll()
 
     def poll(self):
         if self.closed:
             return
-        self.cursor_guard.tick()
+        if self.fullscreen:
+            self.cursor_guard.tick()
         mode, seq, frame = self.session.latest()
         if mode != 'active':
             self.close()
@@ -182,8 +199,12 @@ class FocusOverlay:
             try:
                 image = Image.open(io.BytesIO(frame))
                 image.load()
-                width = max(1, self.window.winfo_screenwidth())
-                height = max(1, self.window.winfo_screenheight() - 48)
+                if self.fullscreen:
+                    width = max(1, self.window.winfo_screenwidth())
+                    height = max(1, self.window.winfo_screenheight() - 48)
+                else:
+                    width = max(1, self.content.winfo_width())
+                    height = max(1, self.content.winfo_height())
                 image.thumbnail((width, height), Image.Resampling.LANCZOS)
                 self.image = ImageTk.PhotoImage(image)
                 self.content.configure(image=self.image, text='')
