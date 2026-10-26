@@ -27,10 +27,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify keyboard mapping
+      - name: Verify keyboard mapping and counter logic
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
+      - name: Compile all Python sources
+        run: python -m compileall -q keyview
       - name: Build portable Windows EXE
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name YEON-KeyView --paths keyview keyview/app.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name YEON-KeyView --paths keyview --hidden-import pystray._win32 keyview/app.py
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
@@ -43,10 +45,12 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.0.${{ github.run_number }}
-          name: YEON KeyView v1.0.${{ github.run_number }}
+          tag_name: keyview-v1.1.${{ github.run_number }}
+          name: YEON KeyView v1.1.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Windows portable EXE for YEON KeyView.
-            Displays physical keyboard presses in an on-screen keyboard.
+            Compact purple KeyView keyboard overlay for Windows.
+            - Key count, KPS and Total counter
+            - Background operation through visible system tray icon
+            - Mouse drag, right-click menu, capture pause and reset

@@ -1,232 +1,284 @@
-"""YEON KeyView — real-time, read-only virtual keyboard visualizer for Windows."""
+"""YEON KeyView - compact violet keyboard overlay with visible tray controls."""
 import queue
 import sys
+import threading
+import time
 import tkinter as tk
 
 import keyboard
+import pystray
+from PIL import Image, ImageDraw
 
-from keymap import MAIN_ROWS, NAV_ROWS, PAD_ROWS, ALL_KEYS, resolve_key
+from keymap import resolve_key
+from stats import KeyCounter, label_for
 
-VERSION = "1.0.0"
-BG = "#0B1020"
-PANEL = "#101B30"
-KEY_BG = "#202D45"
-KEY_OUTLINE = "#344564"
-KEY_TEXT = "#E2EAF8"
-ACTIVE_BG = "#53D9FF"
-ACTIVE_TEXT = "#071522"
-SUBTLE = "#9FAFCB"
-ACCENT = "#74E0FC"
-DANGER = "#FF828F"
-PITCH = 51
-HEIGHT = 45
-BASE_WIDTH = 1192
-BASE_HEIGHT = 338
+VERSION = "1.1.0"
+WIDTH, HEIGHT = 386, 127
+PADDING = 3
+CELL_GAP = 4
+CELL_WIDTH = (WIDTH - 2 * PADDING - 7 * CELL_GAP) / 8
+CELL_HEIGHT = 44
+BG = "#080511"
+CELL_BG = "#231837"
+CELL_STROKE = "#9657E8"
+CELL_GLOW = "#4C2584"
+HELD_BG = "#6737AB"
+HELD_BORDER = "#E7BCFF"
+TEXT = "#FBF5FF"
+COUNT_TEXT = "#DECEFA"
+
+
+def rounded_box(canvas, x, y, w, h, radius, **kw):
+    """Smooth rounded rectangle drawn directly with Tk canvas primitives."""
+    r = min(radius, w / 2, h / 2)
+    points = [
+        x + r, y, x + w - r, y, x + w, y,
+        x + w, y + r, x + w, y + h - r, x + w, y + h,
+        x + w - r, y + h, x + r, y + h, x, y + h,
+        x, y + h - r, x, y + r, x, y,
+    ]
+    return canvas.create_polygon(points, smooth=True, splinesteps=12, **kw)
+
+
+def make_tray_image():
+    image = Image.new("RGBA", (64, 64), "#0B0714")
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((5, 5, 59, 59), radius=12,
+                           fill="#2B1A46", outline="#A86BFF", width=5)
+    draw.line([(21, 17), (21, 47)], fill="#FFFFFF", width=6)
+    draw.line([(44, 16), (24, 32), (44, 48)], fill="#FFFFFF", width=6)
+    return image
 
 
 class KeyView:
     def __init__(self):
         if sys.platform != "win32":
-            raise RuntimeError("YEON KeyView currently supports Windows only.")
-
+            raise RuntimeError("YEON KeyView requires Windows.")
         self.root = tk.Tk()
-        self.root.title(f"YEON KeyView  v{VERSION}")
-        self.root.geometry("1280x470")
-        self.root.minsize(930, 380)
+        self.root.withdraw()
+        self.root.title("YEON KeyView")
         self.root.configure(bg=BG)
-        self.root.attributes("-topmost", True)
+        self.root.overrideredirect(True)
+        self.root.resizable(False, False)
 
-        self.events = queue.SimpleQueue()
-        self.held = set()
-        self.rectangles = {}
-        self.labels = {}
-        self.key_labels = {k.id: k.label for k in ALL_KEYS}
-        self.hook = None
-        self.enabled = False
+        screen_w = self.root.winfo_screenwidth()
+        x = max(0, screen_w - WIDTH - 34)
+        self.root.geometry(f"{WIDTH}x{HEIGHT}+{x}+180")
         self.pinned = True
-        self.draw_task = None
+        self.root.attributes("-topmost", True)
+        self.events = queue.SimpleQueue()
+        self.commands = queue.SimpleQueue()
+        self.counter = KeyCounter()
+        self.running = True
+        self.capture_enabled = False
+        self.hook = None
+        self.tray = None
+        self.tray_started = False
+        self.visible = True
+        self.drag_origin = None
 
-        top = tk.Frame(self.root, bg=BG, padx=24, pady=18)
-        top.pack(fill="x")
-        title_box = tk.Frame(top, bg=BG)
-        title_box.pack(side="left")
-        tk.Label(title_box, text="YEON  /  KEYVIEW", bg=BG, fg=ACCENT,
-                 font=("Segoe UI", 17, "bold")).pack(anchor="w")
-        tk.Label(title_box, text="실제 키보드 입력을 가상 키보드에서 실시간으로 표시합니다.",
-                 bg=BG, fg=SUBTLE, font=("Malgun Gothic", 10)).pack(anchor="w", pady=(3, 0))
+        self.canvas = tk.Canvas(self.root, width=WIDTH, height=HEIGHT, bg=BG,
+                                highlightthickness=0, bd=0, relief="flat")
+        self.canvas.pack()
+        self.canvas.bind("<ButtonPress-1>", self.start_drag)
+        self.canvas.bind("<B1-Motion>", self.drag)
+        self.canvas.bind("<Button-3>", self.show_context_menu)
 
-        tools = tk.Frame(top, bg=BG)
-        tools.pack(side="right")
-        self.pin_button = self.make_button(tools, "항상 위: 켜짐", self.toggle_pin)
-        self.pin_button.pack(side="left", padx=5)
-        self.reset_button = self.make_button(tools, "키 초기화", self.reset_keys)
-        self.reset_button.pack(side="left", padx=5)
-        self.capture_button = self.make_button(tools, "입력 감지 중지", self.toggle_capture, primary=True)
-        self.capture_button.pack(side="left", padx=5)
+        self.menu = tk.Menu(self.root, tearoff=False, bg="#221832", fg=TEXT,
+                            activebackground="#7949B8", activeforeground=TEXT)
+        self.menu.add_command(label="백그라운드로 숨기기", command=self.hide)
+        self.menu.add_command(label="입력 감지 중지 / 다시 시작", command=self.toggle_capture)
+        self.menu.add_command(label="항상 위 켜기 / 끄기", command=self.toggle_pin)
+        self.menu.add_command(label="카운터 초기화", command=self.clear)
+        self.menu.add_separator()
+        self.menu.add_command(label="완전히 종료", command=self.exit)
 
-        board_frame = tk.Frame(self.root, bg=PANEL, highlightbackground="#23334F",
-                               highlightthickness=1, padx=5, pady=6)
-        board_frame.pack(fill="both", expand=True, padx=20, pady=(0, 9))
-        self.canvas = tk.Canvas(board_frame, bg=PANEL, highlightthickness=0,
-                                borderwidth=0, relief="flat")
-        self.canvas.pack(fill="both", expand=True)
-        self.canvas.bind("<Configure>", self.schedule_draw)
-
-        bottom = tk.Frame(self.root, bg=BG, padx=24, pady=9)
-        bottom.pack(fill="x")
-        self.status = tk.Label(bottom, text="● 준비 중", bg=BG, fg=ACCENT,
-                               font=("Malgun Gothic", 10))
-        self.status.pack(side="left")
-        self.recent = tk.Label(bottom, text="마지막 키: —", bg=BG, fg=SUBTLE,
-                               font=("Malgun Gothic", 10))
-        self.recent.pack(side="right")
-
-        self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.root.protocol("WM_DELETE_WINDOW", self.hide)
+        self.install_tray()
         self.set_capture(True)
-        self.root.after(16, self.pump)
+        self.root.deiconify()
+        self.redraw(time.monotonic())
+        self.root.after(33, self.tick)
 
-    @staticmethod
-    def make_button(parent, label, command, primary=False):
-        return tk.Button(parent, text=label, command=command, cursor="hand2",
-                         relief="flat", bd=0, padx=13, pady=9,
-                         bg=ACTIVE_BG if primary else KEY_BG,
-                         fg=ACTIVE_TEXT if primary else KEY_TEXT,
-                         activebackground="#A7EBFF" if primary else "#3A4E70",
-                         activeforeground=ACTIVE_TEXT if primary else KEY_TEXT,
-                         font=("Malgun Gothic", 9, "bold"))
+    def install_tray(self):
+        def enqueue(action):
+            return lambda icon=None, item=None: self.commands.put(action)
 
-    def toggle_pin(self):
-        self.pinned = not self.pinned
-        self.root.attributes("-topmost", self.pinned)
-        self.pin_button.configure(text=f"항상 위: {'켜짐' if self.pinned else '꺼짐'}")
+        menu = pystray.Menu(
+            pystray.MenuItem("YEON KeyView 표시", enqueue("show"), default=True),
+            pystray.MenuItem("백그라운드로 숨기기", enqueue("hide")),
+            pystray.MenuItem("입력 감지 중지 / 다시 시작", enqueue("capture")),
+            pystray.MenuItem("항상 위 켜기 / 끄기", enqueue("pin")),
+            pystray.MenuItem("카운터 초기화", enqueue("clear")),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("완전히 종료", enqueue("exit")),
+        )
+        self.tray = pystray.Icon("yeon-keyview", make_tray_image(),
+                                 "YEON KeyView - 실행 중", menu)
 
-    def toggle_capture(self):
-        self.set_capture(not self.enabled)
+        def run_tray():
+            try:
+                self.tray.run()
+            except Exception:
+                self.commands.put("tray_failed")
 
-    def set_capture(self, value):
-        if value:
+        threading.Thread(target=run_tray, name="KeyViewTray",
+                         daemon=True).start()
+        self.tray_started = True
+
+    def set_capture(self, enabled):
+        if self.hook is not None:
+            try:
+                keyboard.unhook(self.hook)
+            except Exception:
+                pass
+            self.hook = None
+        self.capture_enabled = False
+        self.counter.release_all()
+        self.drain_keyboard_events()
+        if enabled:
             try:
                 self.hook = keyboard.hook(self.on_keyboard_event, suppress=False)
-                self.enabled = True
-                self.capture_button.configure(text="입력 감지 중지")
-                self.status.configure(text="● 모든 창의 키 입력 감지 중", fg=ACCENT)
+                self.capture_enabled = True
             except Exception as error:
-                self.hook = None
-                self.enabled = False
-                self.status.configure(text=f"● 키보드 감지 실패: {type(error).__name__}", fg=DANGER)
-                self.capture_button.configure(text="감지 다시 시작")
-        else:
-            if self.hook is not None:
-                try:
-                    keyboard.unhook(self.hook)
-                except Exception:
-                    pass
-                self.hook = None
-            self.enabled = False
-            self.reset_keys()
-            self.capture_button.configure(text="입력 감지 시작")
-            self.status.configure(text="● 감지 일시 중지", fg=SUBTLE)
+                print(f"KeyView keyboard hook error: {error}", file=sys.stderr)
+
+    def toggle_capture(self):
+        self.set_capture(not self.capture_enabled)
 
     def on_keyboard_event(self, event):
-        # The hook runs in a worker thread. Never call Tk from this thread.
+        # Hook callback is on a worker thread: never call Tkinter from here.
         key_id = resolve_key(getattr(event, "name", None),
                              getattr(event, "scan_code", None),
                              getattr(event, "is_keypad", False))
         if key_id:
             self.events.put((key_id, event.event_type == "down"))
 
-    def pump(self):
-        updated = set()
-        for _ in range(500):
-            try:
-                key_id, down = self.events.get_nowait()
-            except queue.Empty:
-                break
-            if not self.enabled:
-                continue
-            if down:
-                self.held.add(key_id)
-                self.recent.configure(text=f"마지막 키: {self.key_labels.get(key_id, key_id)}")
-            else:
-                self.held.discard(key_id)
-            updated.add(key_id)
-        for key_id in updated:
-            self.paint(key_id)
-        self.root.after(16, self.pump)
-
-    def reset_keys(self):
-        previous = self.held.copy()
-        self.held.clear()
+    def drain_keyboard_events(self):
         while True:
             try:
                 self.events.get_nowait()
             except queue.Empty:
-                break
-        for key_id in previous:
-            self.paint(key_id)
+                return
 
-    def schedule_draw(self, _event=None):
-        if self.draw_task is not None:
-            self.root.after_cancel(self.draw_task)
-        self.draw_task = self.root.after(45, self.draw)
-
-    def draw(self):
-        self.draw_task = None
-        self.canvas.delete("all")
-        self.rectangles.clear()
-        self.labels.clear()
-
-        width = max(10, self.canvas.winfo_width())
-        height = max(10, self.canvas.winfo_height())
-        scale = min(1.14, (width - 24) / BASE_WIDTH, (height - 15) / BASE_HEIGHT)
-        offset_x = (width - BASE_WIDTH * scale) / 2
-        offset_y = (height - BASE_HEIGHT * scale) / 2
-
-        def draw_section(rows, x_units, y_start):
-            for row_index, row in enumerate(rows):
-                x = x_units
-                y = 12 + (y_start + row_index) * PITCH
-                for spec in row:
-                    units = spec.units
-                    if spec.id != "_":
-                        px = offset_x + x * scale
-                        py = offset_y + y * scale
-                        pw = (PITCH * units - 5) * scale
-                        ph = HEIGHT * scale
-                        rectangle = self.canvas.create_rectangle(
-                            px, py, px + pw, py + ph,
-                            fill=KEY_BG, outline=KEY_OUTLINE,
-                            width=max(1, round(scale)))
-                        font_size = max(7, round((9 if len(spec.label) > 5 else 10) * scale))
-                        text = self.canvas.create_text(px + pw / 2, py + ph / 2,
-                                                       text=spec.label, fill=KEY_TEXT,
-                                                       font=("Malgun Gothic", font_size, "bold"))
-                        self.rectangles[spec.id] = rectangle
-                        self.labels[spec.id] = text
-                    x += PITCH * units
-
-        draw_section(MAIN_ROWS, 10, 0)
-        draw_section(NAV_ROWS, 796, 0)
-        draw_section(PAD_ROWS, 969, 1)
-
-        for key_id in self.held:
-            self.paint(key_id)
-
-    def paint(self, key_id):
-        rectangle = self.rectangles.get(key_id)
-        label = self.labels.get(key_id)
-        if rectangle is None or label is None:
+    def tick(self):
+        if not self.running:
             return
-        down = key_id in self.held
-        self.canvas.itemconfig(rectangle,
-                               fill=ACTIVE_BG if down else KEY_BG,
-                               outline=ACTIVE_BG if down else KEY_OUTLINE)
-        self.canvas.itemconfig(label, fill=ACTIVE_TEXT if down else KEY_TEXT)
-
-    def close(self):
-        if self.hook is not None:
+        while True:
             try:
-                keyboard.unhook(self.hook)
+                command = self.commands.get_nowait()
+            except queue.Empty:
+                break
+            actions = {"show": self.show, "hide": self.hide,
+                       "capture": self.toggle_capture, "pin": self.toggle_pin,
+                       "clear": self.clear, "exit": self.exit,
+                       "tray_failed": self.on_tray_failed}
+            actions[command]()
+            if not self.running:
+                return
+
+        now = time.monotonic()
+        for _ in range(500):
+            try:
+                key_id, pressed = self.events.get_nowait()
+            except queue.Empty:
+                break
+            if self.capture_enabled:
+                self.counter.add_event(key_id, pressed, now)
+        self.counter.kps(now)
+        if self.visible:
+            self.redraw(now)
+        self.root.after(33, self.tick)
+
+    def redraw(self, now):
+        canvas = self.canvas
+        canvas.delete("all")
+        for i, key_id in enumerate(self.counter.slots):
+            x = PADDING + (i % 8) * (CELL_WIDTH + CELL_GAP)
+            y = PADDING + (i // 8) * (CELL_HEIGHT + 4)
+            hot = self.counter.highlighted(key_id, now)
+            rounded_box(canvas, x, y, CELL_WIDTH, CELL_HEIGHT, 5,
+                        fill=HELD_BG if hot else CELL_BG,
+                        outline=HELD_BORDER if hot else CELL_GLOW,
+                        width=3)
+            rounded_box(canvas, x + 1, y + 1, CELL_WIDTH - 2, CELL_HEIGHT - 2, 5,
+                        fill=HELD_BG if hot else CELL_BG,
+                        outline=HELD_BORDER if hot else CELL_STROKE,
+                        width=1.6)
+            label = label_for(key_id)
+            font_size = 15 if len(label) <= 3 else (12 if len(label) <= 5 else 10)
+            canvas.create_text(x + CELL_WIDTH / 2, y + 15, text=label,
+                               fill=TEXT, font=("Segoe UI", font_size, "bold"))
+            canvas.create_text(x + CELL_WIDTH / 2, y + 35,
+                               text=str(self.counter.counts.get(key_id, 0)),
+                               fill=COUNT_TEXT, font=("Segoe UI", 11, "bold"))
+        foot_y = 100
+        foot_width = (WIDTH - PADDING * 2 - 4) / 2
+        for x in (PADDING, PADDING + foot_width + 4):
+            rounded_box(canvas, x, foot_y, foot_width, 24, 4,
+                        fill="#20152F", outline=CELL_STROKE, width=1.7)
+        canvas.create_text(9, 111.5, anchor="w", text="KPS",
+                           fill=TEXT, font=("Segoe UI", 13, "bold"))
+        canvas.create_text(PADDING + foot_width - 7, 111.5, anchor="e",
+                           text=str(self.counter.kps(now)),
+                           fill=TEXT, font=("Segoe UI", 13, "bold"))
+        canvas.create_text(PADDING + foot_width + 11, 111.5, anchor="w",
+                           text="Total", fill=TEXT, font=("Segoe UI", 13, "bold"))
+        canvas.create_text(WIDTH - 11, 111.5, anchor="e",
+                           text=str(self.counter.total),
+                           fill=TEXT, font=("Segoe UI", 13, "bold"))
+
+    def start_drag(self, event):
+        self.drag_origin = (event.x_root - self.root.winfo_x(),
+                            event.y_root - self.root.winfo_y())
+
+    def drag(self, event):
+        if self.drag_origin is not None:
+            x = event.x_root - self.drag_origin[0]
+            y = event.y_root - self.drag_origin[1]
+            self.root.geometry(f"+{x}+{y}")
+
+    def show_context_menu(self, event):
+        try:
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
+
+    def toggle_pin(self):
+        self.pinned = not self.pinned
+        self.root.attributes("-topmost", self.pinned)
+
+    def clear(self):
+        self.counter.reset()
+        self.drain_keyboard_events()
+        if self.visible:
+            self.redraw(time.monotonic())
+
+    def show(self):
+        self.visible = True
+        self.root.deiconify()
+        self.root.lift()
+        self.root.attributes("-topmost", self.pinned)
+
+    def hide(self):
+        if not self.tray_started:
+            return
+        self.visible = False
+        self.root.withdraw()
+
+    def on_tray_failed(self):
+        self.tray_started = False
+        if not self.visible:
+            self.show()
+
+    def exit(self):
+        if not self.running:
+            return
+        self.running = False
+        self.set_capture(False)
+        if self.tray is not None:
+            try:
+                self.tray.stop()
             except Exception:
                 pass
         self.root.destroy()
