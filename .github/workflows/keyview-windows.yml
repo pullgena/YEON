@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify themes, keyboard and mouse logic
+      - name: Verify keyboard, mouse, themes and Minecraft optimization
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
       - name: Compile Python code
         run: python -m compileall -q keyview
@@ -45,12 +45,12 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.5.${{ github.run_number }}
-          name: YEON KeyView v1.5.${{ github.run_number }}
+          tag_name: keyview-v1.6.${{ github.run_number }}
+          name: YEON KeyView v1.6.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Six selectable KeyView themes: Halloween, Minecraft, Purple,
-            Cyber, Winter and Cherry Blossom.
-            Seasonal October default and persistent user theme preferences.
-            Keyboard/mouse input overlay, cached low-lag drawing and tray controls.
+            Minecraft-friendly CPU-reduced keyboard/mouse overlay.
+            Dirty key redraw, adaptive UI update frequency, low-rate mouse
+            sampling, optional mouse click-through and gaming mode toggle.
+            Keeps 104-key/16-key/WASD and all six themes.

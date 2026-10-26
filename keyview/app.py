@@ -1,4 +1,5 @@
-"""YEON KeyView v1.5: colorful selectable themes with low-lag canvas and tray."""
+"""YEON KeyView v1.6: Minecraft-friendly low-CPU input overlay."""
+import ctypes
 import queue
 import sys
 import threading
@@ -14,10 +15,11 @@ from keymap import resolve_key
 from modes import MODE_NAMES, get_mode_geometry, label_in_mode, mode_for_chord
 from mouse_panel import PANEL_HEIGHT, mouse_panel_geometry
 from mouse_stats import MouseCounter, MOUSE_LABELS
-from stats import KeyCounter
+from stats import KeyCounter, SHIFTED_LABELS
+from performance import mode_delay, active_keys_for_refresh, active_mouse_for_refresh
 from themes import THEMES, load_theme, save_theme
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 BG = "#080511"
 KEY_BG = "#221633"
 KEY_EDGE = "#9657E8"
@@ -68,8 +70,13 @@ class KeyView:
         self.commands = queue.SimpleQueue()
         self.counter = KeyCounter()
         self.mouse_counter = MouseCounter()
-        self.next_motion_at = 0.0
+        self.last_pointer_position = None
+        self.next_mouse_poll = 0.0
         self.mouse_listener = None
+        self.game_optimized = True
+        self.mouse_passthrough = False
+        self.previous_hot_keys = set()
+        self.previous_hot_mouse = set()
         self.mode = "full"
         self.running = True
         self.visible = True
@@ -122,6 +129,8 @@ class KeyView:
         self.menu.add_command(label="백그라운드로 숨기기", command=self.hide)
         self.menu.add_command(label="입력 감지 중지 / 시작", command=self.toggle_capture)
         self.menu.add_command(label="항상 위 켜기 / 끄기", command=self.toggle_pin)
+        self.menu.add_command(label="마인크래프트 최적화 모드 켜기 / 끄기", command=self.toggle_game_mode)
+        self.menu.add_command(label="마우스 클릭 통과 켜기 / 끄기 (트레이에서 해제)", command=self.toggle_passthrough)
         self.menu.add_command(label="키보드·마우스 카운터 초기화", command=self.reset_counts)
         self.menu.add_separator()
         self.menu.add_command(label="완전히 종료", command=self.exit)
@@ -153,6 +162,10 @@ class KeyView:
             pystray.MenuItem("백그라운드로 숨기기", enqueue("hide")),
             pystray.MenuItem("입력 감지 중지 / 시작", enqueue("capture")),
             pystray.MenuItem("항상 위 켜기 / 끄기", enqueue("pin")),
+            pystray.MenuItem("마인크래프트 최적화 모드", enqueue("gaming"),
+                             checked=lambda item: self.game_optimized),
+            pystray.MenuItem("마우스 클릭 통과 (트레이에서 해제)", enqueue("passthrough"),
+                             checked=lambda item: self.mouse_passthrough),
             pystray.MenuItem("키보드·마우스 카운터 초기화", enqueue("reset")),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("완전히 종료", enqueue("exit")),
@@ -184,6 +197,7 @@ class KeyView:
                 pass
             self.mouse_listener = None
         self.capture_enabled = False
+        self.last_pointer_position = None
         self.counter.release_all()
         self.mouse_counter.release_all()
         self.drain_events()
@@ -197,7 +211,8 @@ class KeyView:
                 listener = mouse_hook.Listener(
                     on_click=self.on_mouse_click,
                     on_scroll=self.on_mouse_scroll,
-                    on_move=self.on_mouse_move,
+                    # No high-frequency on_move callback; poll cursor occasionally.
+                    # Minecraft 26.3 uses relative mouse movement in-game.
                 )
                 listener.start()
                 self.mouse_listener = listener
@@ -233,14 +248,23 @@ class KeyView:
                              "scroll_up" if dy > 0 else "scroll_down",
                              True, time.monotonic()))
 
-    def on_mouse_move(self, x, y):
-        # 8Hz maximum movement events: no cursor coordinates kept or queued.
-        if not self.capture_enabled:
-            return
-        now = time.monotonic()
-        if now >= self.next_motion_at:
-            self.next_motion_at = now + 0.125
-            self.events.put(("mouse_move", "move", True, now))
+    def sample_pointer(self, now):
+        """Low-frequency cursor sampling avoids costly hook callbacks during gaming."""
+        if now < self.next_mouse_poll:
+            return False
+        self.next_mouse_poll = now + (0.24 if self.game_optimized else 0.14)
+        try:
+            current = self.root.winfo_pointerxy()
+        except tk.TclError:
+            return False
+        if self.last_pointer_position is None:
+            self.last_pointer_position = current
+            return False
+        moved = current != self.last_pointer_position
+        self.last_pointer_position = current
+        if moved:
+            self.mouse_counter.add_motion(now)
+        return moved
 
     def drain_events(self):
         while True:
@@ -255,6 +279,7 @@ class KeyView:
         actions = {
             "show": self.show, "hide": self.hide, "capture": self.toggle_capture,
             "pin": self.toggle_pin, "reset": self.reset_counts, "exit": self.exit,
+            "gaming": self.toggle_game_mode, "passthrough": self.toggle_passthrough,
             "tray_error": self.on_tray_error,
         }
         while True:
@@ -272,7 +297,9 @@ class KeyView:
                 return
 
         target_mode = None
-        for _ in range(600):
+        dirty_keys = set()
+        dirty_mouse = set()
+        for _ in range(500):
             try:
                 kind, key_id, down, timestamp = self.events.get_nowait()
             except queue.Empty:
@@ -280,25 +307,45 @@ class KeyView:
             if not self.capture_enabled:
                 continue
             if kind == "mouse_button":
-                self.mouse_counter.add_button(key_id, down, timestamp)
+                if self.mouse_counter.add_button(key_id, down, timestamp):
+                    dirty_mouse.add(key_id)
             elif kind == "mouse_scroll":
-                self.mouse_counter.add_scroll(key_id, timestamp)
-            elif kind == "mouse_move":
-                self.mouse_counter.add_motion(timestamp)
+                if self.mouse_counter.add_scroll(key_id, timestamp):
+                    dirty_mouse.add(key_id)
             elif kind == "key":
-                held_before = self.counter.held.copy() if down and key_id in ("1", "2", "3") else ()
-                is_new = self.counter.add_event(key_id, down, timestamp)
-                requested = mode_for_chord(key_id, down, is_new, held_before)
+                held_before = self.counter.held if down and key_id in ("1", "2", "3") else ()
+                changed = self.counter.add_event(key_id, down, timestamp)
+                if changed:
+                    dirty_keys.add(key_id)
+                    if key_id in ("lshift", "rshift"):
+                        dirty_keys.update(SHIFTED_LABELS)
+                requested = mode_for_chord(key_id, down, changed, held_before)
                 if requested is not None:
                     target_mode = requested
         if target_mode is not None and self.mode != target_mode:
             self.set_mode(target_mode)
 
-        # No full canvas redraw on key events. Only changed Tk item properties
-        # are updated; hidden mode does not paint at all.
+        now = time.monotonic()
+        self.counter.kps(now)
         if self.visible:
-            self.refresh_items(time.monotonic())
-        self.root.after(45 if self.visible else 110, self.tick)
+            if self.capture_enabled and self.sample_pointer(now):
+                dirty_mouse.add("move")
+            # Only pressed or fading keys need repeated checks. In particular,
+            # idle 104-key views no longer walk all 104 Tk items every frame.
+            hot_keys = active_keys_for_refresh(self.counter, now, self.key_items)
+            dirty_keys.update(hot_keys)
+            dirty_keys.update(self.previous_hot_keys)
+            self.previous_hot_keys = hot_keys
+
+            hot_mouse = active_mouse_for_refresh(self.mouse_counter, now, self.mouse_items)
+            dirty_mouse.update(hot_mouse)
+            dirty_mouse.update(self.previous_hot_mouse)
+            self.previous_hot_mouse = hot_mouse
+
+            self.refresh_items(now, key_ids=dirty_keys, mouse_ids=dirty_mouse)
+        # 16 FPS during visual activity; idle frames are slower, hidden 3-4Hz.
+        delay = mode_delay(self.visible, bool(dirty_keys or dirty_mouse), self.game_optimized)
+        self.root.after(delay, self.tick)
 
     def set_mode(self, mode, preserve_position=True):
         if mode not in MODE_NAMES:
@@ -329,6 +376,8 @@ class KeyView:
         self.canvas.delete("all")
         self.key_items.clear()
         self.cached.clear()
+        self.previous_hot_keys.clear()
+        self.previous_hot_mouse.clear()
         self.mouse_items.clear()
         self.cached_mouse.clear()
         self.last_mouse_total = None
@@ -413,9 +462,18 @@ class KeyView:
         self.root.title(f"YEON KeyView - {MODE_NAMES[mode]}")
         self.refresh_items(time.monotonic(), force=True)
 
-    def refresh_items(self, now, force=False):
-        # Important: no canvas.delete(all), polygon construction or new fonts in loop.
-        for key_id, (outer, text_item, count_item) in self.key_items.items():
+    def refresh_items(self, now, force=False, key_ids=None, mouse_ids=None):
+        # Update only keys touched by events or fading highlights; never redraw
+        # the entire canvas unless switching modes or themes.
+        if force or key_ids is None:
+            key_ids = self.key_items.keys()
+        if force or mouse_ids is None:
+            mouse_ids = self.mouse_items.keys()
+        for key_id in key_ids:
+            items = self.key_items.get(key_id)
+            if items is None:
+                continue
+            outer, text_item, count_item = items
             active = self.counter.highlighted(key_id, now)
             label = label_in_mode(self.mode, key_id, self.counter, now)
             count = self.counter.counts.get(key_id, 0)
@@ -438,7 +496,11 @@ class KeyView:
             self.canvas.itemconfigure(self.total_item, text=str(footer[1]))
             self.last_footer = footer
 
-        for mouse_key, (shape, label_item, count_item) in self.mouse_items.items():
+        for mouse_key in mouse_ids:
+            items = self.mouse_items.get(mouse_key)
+            if items is None:
+                continue
+            shape, label_item, count_item = items
             active = self.mouse_counter.highlighted(mouse_key, now)
             value = ("●" if active else "·") if mouse_key == "move" else self.mouse_counter.counts[mouse_key]
             state = (active, value)
@@ -455,6 +517,41 @@ class KeyView:
         if force or self.last_mouse_total != self.mouse_counter.total:
             self.canvas.itemconfigure(self.mouse_total_item, text=str(self.mouse_counter.total))
             self.last_mouse_total = self.mouse_counter.total
+
+    def toggle_game_mode(self):
+        self.game_optimized = not self.game_optimized
+        if self.tray is not None:
+            try:
+                self.tray.update_menu()
+            except Exception:
+                pass
+
+    def toggle_passthrough(self):
+        """Allow Minecraft to receive clicks through the optional overlay."""
+        desired = not self.mouse_passthrough
+        if sys.platform != "win32":
+            return
+        try:
+            user32 = ctypes.windll.user32
+            hwnd = user32.GetAncestor(int(self.root.winfo_id()), 2)  # GA_ROOT
+            if not hwnd:
+                return
+            GWL_EXSTYLE = -20
+            WS_EX_TRANSPARENT = 0x20
+            WS_EX_LAYERED = 0x80000
+            current = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            if desired:
+                updated = current | WS_EX_TRANSPARENT | WS_EX_LAYERED
+            else:
+                updated = current & ~WS_EX_TRANSPARENT
+            user32.SetWindowLongW(hwnd, GWL_EXSTYLE, updated)
+            # Preserve size/position and activate newly applied nonclient style.
+            user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0020)
+            self.mouse_passthrough = desired
+            if self.tray is not None:
+                self.tray.update_menu()
+        except (OSError, ValueError, AttributeError):
+            self.mouse_passthrough = False
 
     def set_theme(self, theme_id):
         """Apply the selected palette and save only its ID locally."""
@@ -502,12 +599,16 @@ class KeyView:
     def reset_counts(self):
         self.counter.reset()
         self.mouse_counter.reset()
+        self.last_pointer_position = None
+        self.previous_hot_keys.clear()
+        self.previous_hot_mouse.clear()
         self.drain_events()
         if self.visible:
             self.refresh_items(time.monotonic(), force=True)
 
     def show(self):
         self.visible = True
+        self.last_pointer_position = None
         self.root.deiconify()
         self.root.lift()
         self.root.attributes("-topmost", self.pinned)
@@ -517,6 +618,7 @@ class KeyView:
         if not self.tray_available:
             return
         self.visible = False
+        self.last_pointer_position = None
         self.root.withdraw()
 
     def on_tray_error(self):
