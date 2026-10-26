@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="YEON MODS - 마인크래프트 Fabric 모드를 무료로 찾아보고 공식 GitHub 릴리스에서 다운로드하세요.">
+<title>YEON MODS — Minecraft 모드 무료 배포</title>
+<style>
+:root{--bg:#080d16;--layer:#111b2c;--layer2:#16243a;--line:#27374e;--text:#ecf5ff;--muted:#96a8c1;--green:#6cf4ae;--blue:#75b9ff;--cyan:#75e4f8;--yellow:#ffd78c;--shadow:0 18px 60px #0007}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Malgun Gothic",sans-serif}a{color:inherit;text-decoration:none}button,input{font:inherit}button{cursor:pointer}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:3px}::selection{background:#60c9a755;color:#fff}
+.background{position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(ellipse 55% 35% at 75% 0%,#123e536b,transparent),radial-gradient(ellipse 55% 40% at 2% 26%,#1a294877,transparent),linear-gradient(#080d16,#0c1524 63%,#080d16)}
+.background:after{content:"";position:absolute;inset:0;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(to bottom,#0005,transparent 82%)}
+.wrap{width:min(1180px,calc(100% - 42px));margin:auto}.header{border-bottom:1px solid #ffffff13;background:#080d16d9;backdrop-filter:blur(16px);position:sticky;top:0;z-index:20}.head-inner{height:75px;display:flex;align-items:center;justify-content:space-between;gap:16px}.brand{display:flex;align-items:center;gap:12px;font-size:19px;font-weight:900;letter-spacing:.6px}.brand-icon{width:35px;height:35px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,#5cf5ad,#3e95ac);color:#06221d;font-size:22px;box-shadow:0 0 27px #58ffc21c}.brand span span{color:var(--green)}.nav{display:flex;align-items:center;gap:28px}.nav a{font-size:14px;color:var(--muted);font-weight:600}.nav a:hover{color:#fff}.pill-link{padding:9px 14px;border:1px solid #435b73;border-radius:12px;color:#f4fbff!important}
+.hero{position:relative;padding:93px 0 98px;display:grid;grid-template-columns:1.14fr .86fr;gap:40px;align-items:center}.kicker{display:inline-flex;gap:8px;align-items:center;padding:6px 12px;border:1px solid #266c5c;border-radius:100px;background:#133d36a8;color:#9cfbd0;font-weight:800;font-size:12px;letter-spacing:.7px}.kicker:before{content:"";width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 11px var(--green)}h1{font-size:clamp(42px,6vw,78px);line-height:1.13;letter-spacing:-3.2px;margin:25px 0 25px;font-weight:900}h1 em{font-style:normal;background:linear-gradient(100deg,#70f6a4,#7ee5ff);background-clip:text;color:transparent}.hero-p{max-width:570px;color:#b5c6d9;font-size:17px;line-height:1.85;margin-bottom:32px}.buttons{display:flex;gap:11px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border-radius:12px;padding:12px 19px;border:1px solid #40536c;color:var(--text);background:#19273b;font-weight:800;font-size:14px;transition:transform .15s,background .15s}.btn:hover{transform:translateY(-2px);background:#263a51}.btn-primary{background:var(--green);border-color:var(--green);color:#082015}.btn-primary:hover{background:#90ffd0}.btn-small{padding:9px 12px;font-size:13px}.btn[disabled]{opacity:.48;cursor:not-allowed;transform:none}.btn-link{background:transparent}.hero-metrics{display:flex;gap:38px;margin-top:43px}.metric strong{display:block;font-size:24px;color:#e9faff}.metric span{color:var(--muted);font-size:12px}
+.visual{position:relative;display:grid;place-items:center;min-height:360px}.visual-glow{position:absolute;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,#26e4a226,transparent 72%);filter:blur(15px)}.showcase{width:min(390px,100%);height:330px;background:linear-gradient(135deg,#20384a,#131e31 72%);border:1px solid #48758a;border-radius:26px;box-shadow:0 35px 80px #0009, inset 0 1px #ffffff24;position:relative;transform:rotate(-5deg);overflow:hidden}.showcase:before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#ffffff07 1px,transparent 1px),linear-gradient(#ffffff07 1px,transparent 1px);background-size:24px 24px}.cube{position:absolute;width:120px;height:120px;top:78px;left:134px;transform:rotate(-23deg) skew(0deg,-1deg);background:linear-gradient(140deg,#77f9b0,#23ab88);box-shadow:25px 28px 0 #155a5f,45px 48px 35px #0007;clip-path:polygon(10% 0,100% 13%,100% 93%,5% 100%,0 15%)}.cube:after{content:"";position:absolute;inset:18px 18px 33px;background:#147b66;clip-path:polygon(0 0,80% 0,100% 20%,100% 100%,0 88%)}.showcase-mark{position:absolute;left:28px;top:24px;color:#a4fbd2;font-size:12px;letter-spacing:3px;font-weight:900}.code{position:absolute;bottom:25px;left:26px;right:26px;font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#a0f0d5;background:#081724ab;padding:14px 18px;border:1px solid #ffffff1f;border-radius:10px}.float-chip{position:absolute;display:flex;align-items:center;gap:8px;background:#152438;border:1px solid #355575;padding:12px 14px;border-radius:12px;box-shadow:var(--shadow);font-size:12px;font-weight:800;z-index:2}.chip1{top:25px;right:-4px}.chip2{bottom:20px;left:-12px}.float-chip b{color:var(--green)}
+.section{padding:35px 0 60px}h2{font-size:32px;letter-spacing:-1.3px;line-height:1.3;margin:0 0 10px}.section-sub{color:var(--muted);margin:0 0 30px}.section-top{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:28px}.search{border:1px solid #3a4e65;background:#111c2e;display:flex;align-items:center;gap:10px;padding:0 15px;border-radius:12px;min-width:min(340px,100%);height:46px;color:var(--muted)}.search input{width:100%;background:none;border:0;outline:0;color:#fff;font-size:14px}.filters{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 26px}.filter{border:1px solid #344862;border-radius:10px;background:#111b2b;color:#a4b7ce;padding:9px 16px;font-weight:750;font-size:13px}.filter:hover{border-color:#7fe9b6}.filter.active{background:#1a483f;border-color:#2ebd82;color:#b8ffdc}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.card{background:linear-gradient(150deg,#17263a,#111b2c 68%);border:1px solid #2b4159;border-radius:20px;padding:25px;display:flex;flex-direction:column;gap:18px;min-width:0;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}.card:hover{border-color:#599e9d;transform:translateY(-4px)}.card-top{display:flex;gap:14px;align-items:center}.card-icon{width:63px;height:63px;display:grid;place-items:center;flex:none;border:1px solid #ffffff28;border-radius:17px;font-size:29px;background:linear-gradient(135deg,#315866,#1c304b)}.card h3{margin:0 0 3px;font-size:21px;letter-spacing:-.5px}.card-id{font-size:12px;color:#8299b4;font-family:ui-monospace,Consolas,monospace}.card-desc{color:#b5c3d5;font-size:14px;margin:0;min-height:45px}.tags{display:flex;gap:7px;flex-wrap:wrap}.tag{color:#b2c5dd;background:#22324a;border:1px solid #354b63;border-radius:7px;padding:4px 8px;font-size:11px;font-weight:800}.tag.warn{color:#ffdca3;background:#46382455;border-color:#675233}.tag.ok{color:#a6ffce;background:#19473566;border-color:#2f8964}.card-bottom{border-top:1px solid #ffffff16;padding-top:17px;margin-top:auto}.release-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;color:#a4b8ce;font-size:12px}.release-row strong{color:#eaf7ff;font-size:13px}.card-actions{display:flex;gap:9px;flex-wrap:wrap}.hidden{display:none!important}.empty{padding:40px 20px;text-align:center;border:1px dashed #38516b;border-radius:20px;color:#9cacc3}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.step{padding:24px;border-radius:16px;background:#121e30;border:1px solid #293d55}.step-num{font:900 21px ui-monospace,Consolas,monospace;color:var(--green);margin-bottom:8px}.step h3{font-size:17px;margin:0 0 9px}.step p{font-size:13px;color:#aabbcf;margin:0}.note{margin-top:28px;padding:18px 21px;border:1px solid #4f573f;background:#272b2011;border-radius:13px;color:#d2d4bd;font-size:13px}.footer{margin-top:50px;padding:33px 0;border-top:1px solid #ffffff19;color:#8da1b8}.footer-inner{display:flex;justify-content:space-between;gap:24px;font-size:13px;flex-wrap:wrap}.footer a{text-decoration:underline;text-underline-offset:4px}
+dialog{max-width:min(600px,calc(100vw - 32px));width:100%;max-height:90dvh;overflow:auto;background:#122035;border:1px solid #4d6781;color:#eef7ff;border-radius:21px;padding:28px;box-shadow:0 30px 90px #000c}dialog::backdrop{background:#000b;backdrop-filter:blur(5px)}.dialog-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.close{background:#26374d;color:#fff;border:1px solid #446079;width:33px;height:33px;border-radius:9px;font-size:20px;line-height:1}.detail-text{color:#c0cee0;white-space:pre-line}.detail-list{color:#b9cae0;padding-left:21px}.detail-list li{margin:7px 0}.small{font-size:12px;color:#91a7bf}.dialog-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+@media(max-width:800px){.hero{grid-template-columns:1fr;padding:70px 0 50px;gap:25px}.visual{min-height:320px}.section-top{align-items:stretch;flex-direction:column}.search{width:100%}.hero-metrics{gap:25px}.nav a:not(.pill-link){display:none}}@media(max-width:640px){.wrap{width:min(100% - 28px,1180px)}.header .head-inner{height:65px}h1{letter-spacing:-2px}.visual{display:none}.grid{grid-template-columns:1fr}.how{grid-template-columns:1fr}.section{padding:24px 0 36px}.card{padding:21px}.hero-p{font-size:15px}.hero-metrics{gap:22px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="background" aria-hidden="true"></div>
+<header class="header"><div class="wrap head-inner">
+<a class="brand" href="#home" aria-label="YEON MODS 홈"><span class="brand-icon">⬡</span><span>YEON <span>MODS</span></span></a>
+<nav class="nav" aria-label="주 메뉴"><a href="#mods">모드 탐색</a><a href="#install">설치 방법</a><a class="pill-link" href="https://github.com/pullgena" target="_blank" rel="noopener noreferrer">GitHub ↗</a></nav>
+</div></header>
+<main>
+<section class="wrap hero" id="home"><div>
+<div class="kicker">FREE MINECRAFT MODS</div>
+<h1>플레이에<br><em>새로운 재미를.</em></h1>
+<p class="hero-p">직접 제작한 Minecraft Java Edition 모드를 한곳에서 만나보세요. 기능을 살펴보고, 공개된 최신 버전을 무료로 다운로드할 수 있습니다.</p>
+<div class="buttons"><a class="btn btn-primary" href="#mods">모드 둘러보기 <span aria-hidden="true">↗</span></a><a class="btn" href="#install">설치 방법 보기</a></div>
+<div class="hero-metrics"><div class="metric"><strong id="totalCount">4</strong><span>등록된 모드</span></div><div class="metric"><strong id="readyCount">—</strong><span>JAR 다운로드 제공</span></div><div class="metric"><strong>FREE</strong><span>무료 제공</span></div></div>
+</div><div class="visual" aria-hidden="true"><div class="visual-glow"></div><div class="showcase"><div class="showcase-mark">YEON / CUSTOM MODS</div><div class="cube"></div><div class="code">minecraft.fabric // 26.x<br>mods.install('new_experience');</div></div><div class="float-chip chip1">✦ <b>Fabric</b> 모드</div><div class="float-chip chip2">⬇ 0원 · 무료 다운로드</div></div></section>
+<section class="wrap section" id="mods"><div class="section-top"><div><h2>모드 라이브러리</h2><p class="section-sub">모든 다운로드는 제작자의 GitHub 공식 릴리스와 연결됩니다.</p></div><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="모드 이름 또는 기능 검색" autocomplete="off" aria-label="모드 검색"></label></div>
+<div class="filters" role="group" aria-label="모드 필터"><button type="button" class="filter active" data-filter="all" aria-pressed="true">전체</button><button type="button" class="filter" data-filter="26.3" aria-pressed="false">Minecraft 26.3</button><button type="button" class="filter" data-filter="26.2" aria-pressed="false">Minecraft 26.2</button><button type="button" class="filter" data-filter="ready" aria-pressed="false">다운로드 가능</button></div>
+<div id="modGrid" class="grid" aria-live="polite"></div><div id="empty" class="empty hidden">조건에 맞는 모드가 없습니다. 검색어나 필터를 바꿔보세요.</div>
+</section>
+<section class="wrap section" id="install"><h2>3단계로 설치하기</h2><p class="section-sub">모드마다 설치 대상과 필수 모드가 다르므로 상세 정보를 먼저 확인해 주세요.</p>
+<div class="how"><div class="step"><div class="step-num">01</div><h3>버전 확인</h3><p>마인크래프트 버전(26.2 또는 26.3)과 Fabric Loader, Java 요구 사항을 확인하세요.</p></div><div class="step"><div class="step-num">02</div><h3>JAR 다운로드</h3><p>모드 카드에서 공개 릴리스의 JAR 파일을 다운로드합니다. 릴리스가 없는 모드는 아직 내려받을 수 없습니다.</p></div><div class="step"><div class="step-num">03</div><h3>mods 폴더에 설치</h3><p>필요한 Fabric API 및 의존성과 함께 JAR를 mods 폴더에 넣고 게임 또는 서버를 재시작하세요.</p></div></div>
+<div class="note">※ 이 사이트는 모드의 정상 작동을 보증하지 않습니다. 현재 일부 모드는 시험 개발 단계입니다. 기존 월드와 서버는 먼저 백업하고 테스트해 주세요. GitHub에서 소스 코드 다운로드(ZIP)는 배포용 JAR 파일과 다릅니다.</div>
+</section>
+</main>
+<footer class="footer"><div class="wrap footer-inner"><span>© YEON MODS · Minecraft Java Edition 비공식 팬 제작 모드</span><span>이 사이트는 Mojang 또는 Microsoft와 공식 제휴하지 않습니다. · <a href="https://github.com/pullgena" target="_blank" rel="noopener noreferrer">제작 저장소</a></span></div></footer>
+<dialog id="detailDialog" aria-labelledby="detailTitle"><div class="dialog-top"><div><div class="kicker">MOD DETAILS</div><h2 id="detailTitle" style="margin-top:14px"></h2></div><button id="closeDialog" class="close" type="button" aria-label="닫기">×</button></div><div id="detailBody"></div><div class="dialog-actions"><a id="dialogDownload" class="btn btn-primary hidden" href="#" target="_blank" rel="noopener noreferrer">JAR 다운로드 ↗</a><a id="dialogRepo" class="btn" href="#" target="_blank" rel="noopener noreferrer">GitHub 저장소 ↗</a></div></dialog>
+<script>
+"use strict";
+const mods = [
+ {id:"phone-mod",title:"Voice Phone",symbol:"☎",version:"26.3",category:"통신 · 보이스챗",desc:"Simple Voice Chat을 활용해 게임 속에서 다른 플레이어에게 전화를 걸고 받을 수 있는 모드입니다.",requirements:["Minecraft Java Edition 26.3 / Fabric","Fabric API / Simple Voice Chat","서버와 접속하는 모든 클라이언트에 설치","Simple Voice Chat 음성 통신을 위한 서버 UDP 포트 설정"],detail:"전화기 아이템을 사용해 상대 플레이어에게 전화를 걸고, 수신 팝업으로 통화를 받을 수 있습니다. 실제 멀티플레이 환경에서는 별도 테스트가 필요합니다.",warning:"개발 중 · 충분한 멀티플레이 검증 필요"},
+ {id:"mod-of-mod",title:"Mod of Mod",symbol:"◈",version:"26.3",category:"편의 기능 · UI",desc:"플레이어 레이더, 발전과제 코인 보상, 상점, 애니메이션과 관리자 패널을 추가합니다.",requirements:["Minecraft Java Edition 26.3 / Fabric","Fabric API / Java 25","서버 및 모든 클라이언트에 동일 버전 설치"],detail:"B키로 상점을 열고 J키로 레이더를 전환합니다. OP는 /관리자 패널 및 /업데이트 명령을 사용할 수 있습니다. 현재 시험 개발본으로 실제 빌드와 게임 내 검증이 필요합니다.",warning:"시험 개발본 · 공개 배포 릴리스 확인 필요"},
+ {id:"op-mod",title:"OP Maintenance",symbol:"⚒",version:"26.2",category:"서버 관리",desc:"서버의 점검 상태를 설정하고 MOTD를 변경하며, 서버 종료 및 재시작 절차를 도와줍니다.",requirements:["Minecraft Java Edition 26.2 / Fabric 서버","Fabric API / Java 25 이상","서버 mods 폴더에 설치"],detail:"/점검 및 /재시작 명령을 지원합니다. /재시작은 서버 종료 절차를 수행하며 실제 재가동은 호스팅의 자동 재시작 설정에 달려 있습니다.",warning:"서버 전용 · 재시작은 호스트 설정 필요"},
+ {id:"EasyCraft-Launcher-mod",title:"EasyCraft Launcher Label",symbol:"▣",version:"26.2",category:"런처 · 화면 꾸미기",desc:"Minecraft 메인 화면에 'EasyCraft Launcher으로 실행됨' 안내 문구를 표시합니다.",requirements:["Minecraft Java Edition 26.2 / Fabric","Fabric API / Java 25 이상","클라이언트 mods 폴더에 설치"],detail:"메인 화면에 커스텀 런처 실행 표시를 추가하는 클라이언트용 모드입니다. 일부 버전에서는 호환성 확인이 필요할 수 있습니다.",warning:"클라이언트 전용"}
+];
+const owner="pullgena";
+const states=new Map();
+let activeFilter="all";
+const grid=document.getElementById("modGrid");
+const dialog=document.getElementById("detailDialog");
+function linkFor(mod){return "https://github.com/"+owner+"/"+mod.id;}
+function labelFor(mod){const s=states.get(mod.id);if(!s||s.status==="loading")return "릴리스 확인 중…";if(s.status==="ready")return s.tag;if(s.status==="none")return "공개 릴리스 없음";return "상태 확인 실패";}
+function assetFor(release){return (release.assets||[]).find(a=>a&&a.state==="uploaded"&&/\.jar$/i.test(a.name)&&!/sources|javadoc|dev|test/i.test(a.name)&&/^https:\/\/github\.com\/pullgena\//.test(a.browser_download_url||""))||null;}
+async function fetchLatest(mod){
+  try{
+    const res=await fetch("https://api.github.com/repos/"+owner+"/"+encodeURIComponent(mod.id)+"/releases/latest",{headers:{"Accept":"application/vnd.github+json"}});
+    if(res.status===404){states.set(mod.id,{status:"none"});return;}
+    if(!res.ok)throw new Error("GitHub API "+res.status);
+    const release=await res.json(),asset=assetFor(release);
+    states.set(mod.id,{status:asset?"ready":"none",tag:String(release.tag_name||"버전 확인"),url:asset&&asset.browser_download_url,releaseUrl:release.html_url});
+  }catch(err){states.set(mod.id,{status:"error"});}
+}
+function make(tag,cls,txt){const x=document.createElement(tag);if(cls)x.className=cls;if(txt!==undefined)x.textContent=txt;return x;}
+function anchor(href,text,cls){const a=make("a",cls,text);a.href=href;a.target="_blank";a.rel="noopener noreferrer";return a;}
+function button(text,cls,handler){const b=make("button",cls,text);b.type="button";b.addEventListener("click",handler);return b;}
+function addTag(parent,text,cls){parent.append(make("span","tag "+(cls||""),text));}
+function renderCard(mod){
+ const s=states.get(mod.id)||{status:"loading"};
+ const card=make("article","card");
+ const top=make("div","card-top");top.append(make("div","card-icon",mod.symbol));
+ const tit=make("div");tit.append(make("h3","",mod.title),make("div","card-id",mod.id));top.append(tit);card.append(top);
+ card.append(make("p","card-desc",mod.desc));
+ const tags=make("div","tags");addTag(tags,"Fabric");addTag(tags,"MC "+mod.version);addTag(tags,mod.category);
+ if(s.status==="ready")addTag(tags,"JAR 배포 중","ok");
+ if(s.status==="none")addTag(tags,"릴리스 미게시","warn");
+ card.append(tags);
+ const bottom=make("div","card-bottom");
+ const row=make("div","release-row");row.append(make("span","", "공식 배포 상태"),make("strong","",labelFor(mod)));bottom.append(row);
+ const actions=make("div","card-actions");
+ if(s.status==="ready"&&s.url){actions.append(anchor(s.url,"↓ 무료 다운로드","btn btn-primary btn-small"));}
+ else{const a=anchor(linkFor(mod)+"/releases","릴리스 확인 ↗","btn btn-small");actions.append(a);}
+ actions.append(button("상세 정보","btn btn-link btn-small",()=>openDetail(mod)));
+ bottom.append(actions);card.append(bottom);
+ return card;
+}
+function render(){
+ const query=document.getElementById("search").value.trim().toLocaleLowerCase("ko");
+ const matched=mods.filter(m=>{
+   const s=states.get(m.id);
+   const inFilter=activeFilter==="all"||activeFilter===m.version||(activeFilter==="ready"&&s&&s.status==="ready");
+   const inSearch=[m.title,m.id,m.version,m.category,m.desc].join(" ").toLocaleLowerCase("ko").includes(query);
+   return inFilter&&inSearch;
+ });
+ grid.replaceChildren(...matched.map(renderCard));
+ document.getElementById("empty").classList.toggle("hidden",matched.length!==0);
+ document.getElementById("totalCount").textContent=String(mods.length);
+ const loading=mods.some(m=>states.get(m.id)?.status==="loading");
+ document.getElementById("readyCount").textContent=loading?"…":String(mods.filter(m=>states.get(m.id)?.status==="ready").length);
+}
+function openDetail(mod){
+ const s=states.get(mod.id)||{status:"loading"};
+ document.getElementById("detailTitle").textContent=mod.title;
+ const body=document.getElementById("detailBody");body.replaceChildren();
+ body.append(make("p","detail-text",mod.detail));
+ const subtitle=make("h3","","설치 요구 사항");subtitle.style.fontSize="16px";body.append(subtitle);
+ const ul=make("ul","detail-list");mod.requirements.forEach(r=>ul.append(make("li","",r)));body.append(ul);
+ body.append(make("p","small","버전: "+mod.version+" · "+mod.category));
+ body.append(make("p","small","주의: "+mod.warning));
+ body.append(make("p","small","공개 릴리스: "+labelFor(mod)));
+ const dl=document.getElementById("dialogDownload");dl.classList.toggle("hidden",s.status!=="ready"||!s.url);
+ if(s.url)dl.href=s.url;
+ document.getElementById("dialogRepo").href=linkFor(mod);
+ dialog.showModal();
+}
+document.getElementById("search").addEventListener("input",render);
+document.querySelectorAll(".filter").forEach(btn=>btn.addEventListener("click",()=>{
+ activeFilter=btn.dataset.filter;
+ document.querySelectorAll(".filter").forEach(b=>{const on=b===btn;b.classList.toggle("active",on);b.setAttribute("aria-pressed",String(on));});
+ render();
+}));
+document.getElementById("closeDialog").addEventListener("click",()=>dialog.close());
+dialog.addEventListener("click",e=>{if(e.target===dialog)dialog.close();});
+mods.forEach(m=>states.set(m.id,{status:"loading"}));render();
+Promise.all(mods.map(fetchLatest)).then(render);
+</script>
+</body>
+</html>
