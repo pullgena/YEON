@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify keyboard modes, mouse tracking and counters
+      - name: Verify themes, keyboard and mouse logic
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
       - name: Compile Python code
         run: python -m compileall -q keyview
@@ -45,12 +45,12 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.4.${{ github.run_number }}
-          name: YEON KeyView v1.4.${{ github.run_number }}
+          tag_name: keyview-v1.5.${{ github.run_number }}
+          name: YEON KeyView v1.5.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Mouse button, wheel and movement visualizer added to all keyboard modes.
-            LMB, MMB, RMB, wheel up/down and MOVE indicators with counts.
-            Shift+1 photo 16-key, Shift+2 WASD+Space, Shift+3 full 104-key.
-            Low-lag cached canvas, background tray, KPS and keyboard Total.
+            Six selectable KeyView themes: Halloween, Minecraft, Purple,
+            Cyber, Winter and Cherry Blossom.
+            Seasonal October default and persistent user theme preferences.
+            Keyboard/mouse input overlay, cached low-lag drawing and tray controls.

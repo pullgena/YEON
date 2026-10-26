@@ -1,4 +1,4 @@
-"""YEON KeyView v1.4: efficient keyboard and mouse input overlay with tray."""
+"""YEON KeyView v1.5: colorful selectable themes with low-lag canvas and tray."""
 import queue
 import sys
 import threading
@@ -15,8 +15,9 @@ from modes import MODE_NAMES, get_mode_geometry, label_in_mode, mode_for_chord
 from mouse_panel import PANEL_HEIGHT, mouse_panel_geometry
 from mouse_stats import MouseCounter, MOUSE_LABELS
 from stats import KeyCounter
+from themes import THEMES, load_theme, save_theme
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 BG = "#080511"
 KEY_BG = "#221633"
 KEY_EDGE = "#9657E8"
@@ -39,13 +40,13 @@ def rounded_box(canvas, x, y, w, h, radius, **kw):
     return canvas.create_polygon(points, smooth=True, splinesteps=8, **kw)
 
 
-def tray_image():
-    image = Image.new("RGBA", (64, 64), "#0B0714")
+def tray_image(palette):
+    image = Image.new("RGBA", (64, 64), palette["background"])
     draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((5, 5, 59, 59), radius=12,
-                           fill="#2B1A46", outline="#A86BFF", width=5)
-    draw.line([(21, 17), (21, 47)], fill="#FFFFFF", width=6)
-    draw.line([(44, 16), (24, 32), (44, 48)], fill="#FFFFFF", width=6)
+    draw.rounded_rectangle((5, 5, 59, 59), radius=0 if palette["pixel"] else 12,
+                           fill=palette["key"], outline=palette["edge"], width=5)
+    draw.line([(21, 17), (21, 47)], fill=palette["text"], width=6)
+    draw.line([(44, 16), (24, 32), (44, 48)], fill=palette["text"], width=6)
     return image
 
 
@@ -58,7 +59,10 @@ class KeyView:
         self.root.withdraw()
         self.root.title("YEON KeyView")
         self.root.overrideredirect(True)
-        self.root.configure(bg=BG)
+        self.theme = load_theme()
+        self.palette = THEMES[self.theme]
+        self.theme_choice = tk.StringVar(master=self.root, value=self.theme)
+        self.root.configure(bg=self.palette["background"])
 
         self.events = queue.SimpleQueue()
         self.commands = queue.SimpleQueue()
@@ -90,18 +94,30 @@ class KeyView:
         self.screen_h = self.root.winfo_screenheight()
         self.window_position = None
 
-        self.canvas = tk.Canvas(self.root, bg=BG, highlightthickness=0, bd=0)
+        self.canvas = tk.Canvas(self.root, bg=self.palette["background"], highlightthickness=0, bd=0)
         self.canvas.pack()
         self.canvas.bind("<ButtonPress-1>", self.start_drag)
         self.canvas.bind("<B1-Motion>", self.drag)
         self.canvas.bind("<Button-3>", self.context_menu)
 
-        self.menu = tk.Menu(self.root, tearoff=False, bg="#221832", fg=TEXT,
-                            activebackground="#7949B8", activeforeground=TEXT)
+        self.menu = tk.Menu(self.root, tearoff=False, bg=self.palette["menu"],
+                            fg=self.palette["text"],
+                            activebackground=self.palette["hover"],
+                            activeforeground=self.palette["text"])
         for m, title in (("full", "104키 표시 (Shift+3)"),
                          ("photo", "사진 16키 표시 (Shift+1)"),
                          ("wasd", "WASD + Space 표시 (Shift+2)")):
             self.menu.add_command(label=title, command=lambda value=m: self.set_mode(value))
+        self.menu.add_separator()
+        self.theme_menu = tk.Menu(self.menu, tearoff=False, bg=self.palette["menu"],
+                                  fg=self.palette["text"],
+                                  activebackground=self.palette["hover"],
+                                  activeforeground=self.palette["text"])
+        for theme_id, theme_data in THEMES.items():
+            self.theme_menu.add_radiobutton(
+                label=theme_data["name"], variable=self.theme_choice,
+                value=theme_id, command=lambda value=theme_id: self.set_theme(value))
+        self.menu.add_cascade(label="테마 변경", menu=self.theme_menu)
         self.menu.add_separator()
         self.menu.add_command(label="백그라운드로 숨기기", command=self.hide)
         self.menu.add_command(label="입력 감지 중지 / 시작", command=self.toggle_capture)
@@ -127,6 +143,13 @@ class KeyView:
             pystray.MenuItem("사진 16키 (Shift+1)", enqueue("photo")),
             pystray.MenuItem("WASD + Space (Shift+2)", enqueue("wasd")),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("테마 변경", pystray.Menu(
+                *[pystray.MenuItem(data["name"], enqueue("theme:" + key),
+                                  checked=lambda item, expected=key: self.theme == expected,
+                                  radio=True)
+                  for key, data in THEMES.items()]
+            )),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("백그라운드로 숨기기", enqueue("hide")),
             pystray.MenuItem("입력 감지 중지 / 시작", enqueue("capture")),
             pystray.MenuItem("항상 위 켜기 / 끄기", enqueue("pin")),
@@ -134,7 +157,7 @@ class KeyView:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("완전히 종료", enqueue("exit")),
         )
-        self.tray = pystray.Icon("yeon-keyview", tray_image(),
+        self.tray = pystray.Icon("yeon-keyview", tray_image(self.palette),
                                  "YEON KeyView - 실행 중", menu)
 
         def worker():
@@ -241,6 +264,8 @@ class KeyView:
                 break
             if action in MODE_NAMES:
                 self.set_mode(action)
+            elif action.startswith("theme:"):
+                self.set_theme(action.split(":", 1)[1])
             else:
                 actions[action]()
             if not self.running:
@@ -310,14 +335,17 @@ class KeyView:
         self.last_footer = None
 
         def font(size):
-            return ("Segoe UI", max(7, round(size * self.scale)), "bold")
+            family = "Consolas" if self.palette["pixel"] else "Segoe UI"
+            return (family, max(7, round(size * self.scale)), "bold")
 
         for key_id, (kx, ky, kw, kh) in positions.items():
             held = self.counter.highlighted(key_id, time.monotonic())
             label = label_in_mode(self.mode, key_id, self.counter, time.monotonic())
-            outer = rounded_box(self.canvas, kx, ky, kw, kh, 5,
-                                fill=ACTIVE_BG if held else KEY_BG,
-                                outline=ACTIVE_EDGE if held else KEY_EDGE, width=2.2)
+            outer = rounded_box(self.canvas, kx, ky, kw, kh,
+                                0 if self.palette["pixel"] else 5,
+                                fill=self.palette["active"] if held else self.palette["key"],
+                                outline=self.palette["active_edge"] if held else self.palette["edge"],
+                                width=2.2)
             label_size = 16 if len(label) <= 2 else (12 if len(label) <= 5 else 10)
             if mode == "full":
                 label_y = ky + (17 if kh < 60 else kh / 2 - 10)
@@ -326,11 +354,11 @@ class KeyView:
                 label_y = ky + kh * 0.36
                 count_y = ky + kh * 0.79
             text_item = self.canvas.create_text(kx + kw / 2, label_y,
-                                                text=label, fill=TEXT,
+                                                text=label, fill=self.palette["text"],
                                                 font=font(label_size))
             count_value = str(self.counter.counts.get(key_id, 0))
             count_item = self.canvas.create_text(kx + kw / 2, count_y,
-                                                 text=count_value, fill=COUNT_TEXT,
+                                                 text=count_value, fill=self.palette["count"],
                                                  font=font(11))
             self.key_items[key_id] = (outer, text_item, count_item)
 
@@ -339,38 +367,46 @@ class KeyView:
         for left in (side_pad, side_pad + footer_w + 5):
             rounded_box(self.canvas, left, footer_y, footer_w,
                         24 if mode == "photo" else 29, 4,
-                        fill=FOOT_BG, outline=KEY_EDGE, width=1.8)
+                        fill=self.palette["footer"], outline=self.palette["edge"],
+                        width=1.8)
         fy = footer_y + (12 if mode == "photo" else 15)
         self.canvas.create_text(side_pad + 8, fy, anchor="w", text="KPS",
-                                fill=TEXT, font=font(15))
+                                fill=self.palette["text"], font=font(15))
         self.kps_item = self.canvas.create_text(side_pad + footer_w - 11, fy,
                                                 anchor="e", text="0",
-                                                fill=TEXT, font=font(15))
+                                                fill=self.palette["text"], font=font(15))
         self.canvas.create_text(side_pad + footer_w + 13, fy, anchor="w",
-                                text="Total", fill=TEXT, font=font(15))
+                                text="Total", fill=self.palette["text"], font=font(15))
         self.total_item = self.canvas.create_text(width - side_pad - 10, fy,
                                                   anchor="e", text="0",
-                                                  fill=TEXT, font=font(15))
+                                                  fill=self.palette["text"], font=font(15))
 
         # Separate purple mouse panel, kept in all three keyboard modes.
+        # Theme accent drawn only when the mode/theme changes, never per tick.
+        self.canvas.create_rectangle(0, keyboard_height + 1, width, keyboard_height + 4,
+                                     fill=self.palette["accent"], outline="")
         heading, mouse_boxes = mouse_panel_geometry(width, keyboard_height)
         hx, hy, hw, hh = heading
         rounded_box(self.canvas, hx, hy, hw, hh, 5,
-                    fill=FOOT_BG, outline=KEY_EDGE, width=1.7)
+                    fill=self.palette["footer"], outline=self.palette["edge"],
+                    width=1.7)
         self.canvas.create_text(hx + hw / 2, hy + 22, text="MOUSE",
-                                fill=TEXT, font=font(12))
+                                fill=self.palette["text"], font=font(12))
         self.mouse_total_item = self.canvas.create_text(
-            hx + hw / 2, hy + 50, text="0", fill=COUNT_TEXT, font=font(15))
+            hx + hw / 2, hy + 50, text="0", fill=self.palette["count"], font=font(15))
         for mouse_key, (mx, my, mw, mh) in mouse_boxes.items():
-            shape = rounded_box(self.canvas, mx, my, mw, mh, 5,
-                                fill=KEY_BG, outline=KEY_EDGE, width=1.8)
+            shape = rounded_box(self.canvas, mx, my, mw, mh,
+                                0 if self.palette["pixel"] else 5,
+                                fill=self.palette["mouse"],
+                                outline=self.palette["edge"], width=1.8)
             text_label = self.canvas.create_text(
                 mx + mw / 2, my + 22, text=MOUSE_LABELS[mouse_key],
-                fill=TEXT, font=font(11 if mouse_key != "move" else 9))
+                fill=self.palette["text"],
+                font=font(11 if mouse_key != "move" else 9))
             text_count = self.canvas.create_text(
                 mx + mw / 2, my + mh - 13,
                 text="·" if mouse_key == "move" else "0",
-                fill=COUNT_TEXT, font=font(12))
+                fill=self.palette["count"], font=font(12))
             self.mouse_items[mouse_key] = (shape, text_label, text_count)
         if self.scale != 1.0:
             self.canvas.scale("all", 0, 0, self.scale, self.scale)
@@ -388,8 +424,9 @@ class KeyView:
             if not force and old == state:
                 continue
             if force or old is None or old[0] != active:
-                self.canvas.itemconfigure(outer, fill=ACTIVE_BG if active else KEY_BG,
-                                          outline=ACTIVE_EDGE if active else KEY_EDGE)
+                self.canvas.itemconfigure(outer,
+                                          fill=self.palette["active"] if active else self.palette["key"],
+                                          outline=self.palette["active_edge"] if active else self.palette["edge"])
             if force or old is None or old[1] != label:
                 self.canvas.itemconfigure(text_item, text=label)
             if force or old is None or old[2] != count:
@@ -408,14 +445,38 @@ class KeyView:
             old = self.cached_mouse.get(mouse_key)
             if force or old != state:
                 if force or old is None or old[0] != active:
-                    self.canvas.itemconfigure(shape, fill=ACTIVE_BG if active else KEY_BG,
-                                              outline=ACTIVE_EDGE if active else KEY_EDGE)
+                    self.canvas.itemconfigure(
+                        shape,
+                        fill=self.palette["active"] if active else self.palette["mouse"],
+                        outline=self.palette["active_edge"] if active else self.palette["edge"])
                 if force or old is None or old[1] != value:
                     self.canvas.itemconfigure(count_item, text=str(value))
                 self.cached_mouse[mouse_key] = state
         if force or self.last_mouse_total != self.mouse_counter.total:
             self.canvas.itemconfigure(self.mouse_total_item, text=str(self.mouse_counter.total))
             self.last_mouse_total = self.mouse_counter.total
+
+    def set_theme(self, theme_id):
+        """Apply the selected palette and save only its ID locally."""
+        if theme_id not in THEMES:
+            return
+        self.theme = theme_id
+        self.palette = THEMES[theme_id]
+        self.theme_choice.set(theme_id)
+        self.root.configure(bg=self.palette["background"])
+        self.canvas.configure(bg=self.palette["background"])
+        for menu in (self.menu, self.theme_menu):
+            menu.configure(bg=self.palette["menu"], fg=self.palette["text"],
+                           activebackground=self.palette["hover"],
+                           activeforeground=self.palette["text"])
+        if self.tray is not None:
+            try:
+                self.tray.icon = tray_image(self.palette)
+                self.tray.update_menu()
+            except Exception:
+                pass
+        save_theme(theme_id)
+        self.set_mode(self.mode)
 
     def start_drag(self, event):
         self.drag_origin = (event.x_root - self.root.winfo_x(),
