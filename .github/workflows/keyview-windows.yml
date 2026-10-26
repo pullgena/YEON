@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify keyboard, mouse, themes and Minecraft optimization
+      - name: Verify keyboard, mouse, themes, zoom and game optimizations
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
       - name: Compile Python code
         run: python -m compileall -q keyview
@@ -45,12 +45,13 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.6.${{ github.run_number }}
-          name: YEON KeyView v1.6.${{ github.run_number }}
+          tag_name: keyview-v1.7.${{ github.run_number }}
+          name: YEON KeyView v1.7.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Minecraft-friendly CPU-reduced keyboard/mouse overlay.
-            Dirty key redraw, adaptive UI update frequency, low-rate mouse
-            sampling, optional mouse click-through and gaming mode toggle.
-            Keeps 104-key/16-key/WASD and all six themes.
+            Resize KeyView with a bottom-right drag handle, Ctrl+mousewheel,
+            popup menu presets or Windows tray controls.
+            Zoom 50%-150% persists across launches; same setting works
+            with photo 16-key, WASD and 104-key keyboard modes.
+            Retains mouse indicators, six themes and Minecraft optimizations.

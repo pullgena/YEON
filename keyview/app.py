@@ -1,4 +1,4 @@
-"""YEON KeyView v1.6: Minecraft-friendly low-CPU input overlay."""
+"""YEON KeyView v1.7: adjustable-size Minecraft-friendly input overlay."""
 import ctypes
 import queue
 import sys
@@ -18,8 +18,9 @@ from mouse_stats import MouseCounter, MOUSE_LABELS
 from stats import KeyCounter, SHIFTED_LABELS
 from performance import mode_delay, active_keys_for_refresh, active_mouse_for_refresh
 from themes import THEMES, load_theme, save_theme
+from sizing import MIN_ZOOM, MAX_ZOOM, PRESETS, clamp_zoom, fit_scale, load_zoom, save_zoom
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 BG = "#080511"
 KEY_BG = "#221633"
 KEY_EDGE = "#9657E8"
@@ -64,6 +65,11 @@ class KeyView:
         self.theme = load_theme()
         self.palette = THEMES[self.theme]
         self.theme_choice = tk.StringVar(master=self.root, value=self.theme)
+        self.zoom = load_zoom()
+        self.zoom_choice = tk.IntVar(master=self.root, value=self.zoom)
+        self.resize_origin = None
+        self.resize_pending = None
+        self.resize_last_draw = 0.0
         self.root.configure(bg=self.palette["background"])
 
         self.events = queue.SimpleQueue()
@@ -105,6 +111,8 @@ class KeyView:
         self.canvas.pack()
         self.canvas.bind("<ButtonPress-1>", self.start_drag)
         self.canvas.bind("<B1-Motion>", self.drag)
+        self.canvas.bind("<ButtonRelease-1>", self.end_drag)
+        self.canvas.bind("<Control-MouseWheel>", self.on_zoom_wheel)
         self.canvas.bind("<Button-3>", self.context_menu)
 
         self.menu = tk.Menu(self.root, tearoff=False, bg=self.palette["menu"],
@@ -125,6 +133,18 @@ class KeyView:
                 label=theme_data["name"], variable=self.theme_choice,
                 value=theme_id, command=lambda value=theme_id: self.set_theme(value))
         self.menu.add_cascade(label="테마 변경", menu=self.theme_menu)
+        self.size_menu = tk.Menu(self.menu, tearoff=False,
+                                 bg=self.palette["menu"], fg=self.palette["text"],
+                                 activebackground=self.palette["hover"],
+                                 activeforeground=self.palette["text"])
+        self.size_menu.add_command(label="확대 +10%", command=lambda: self.step_zoom(10))
+        self.size_menu.add_command(label="축소 -10%", command=lambda: self.step_zoom(-10))
+        self.size_menu.add_separator()
+        for percent in PRESETS:
+            self.size_menu.add_radiobutton(
+                label=f"{percent}%", variable=self.zoom_choice, value=percent,
+                command=lambda number=percent: self.set_zoom(number))
+        self.menu.add_cascade(label="크기 조절", menu=self.size_menu)
         self.menu.add_separator()
         self.menu.add_command(label="백그라운드로 숨기기", command=self.hide)
         self.menu.add_command(label="입력 감지 중지 / 시작", command=self.toggle_capture)
@@ -157,6 +177,14 @@ class KeyView:
                                   checked=lambda item, expected=key: self.theme == expected,
                                   radio=True)
                   for key, data in THEMES.items()]
+            )),
+            pystray.MenuItem("크기 조절", pystray.Menu(
+                pystray.MenuItem("확대 +10%", enqueue("zoom:+10")),
+                pystray.MenuItem("축소 -10%", enqueue("zoom:-10")),
+                pystray.Menu.SEPARATOR,
+                *[pystray.MenuItem(f"{percent}%", enqueue("zoom:" + str(percent)),
+                                   checked=lambda item, expected=percent: self.zoom == expected,
+                                   radio=True) for percent in PRESETS]
             )),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("백그라운드로 숨기기", enqueue("hide")),
@@ -291,6 +319,12 @@ class KeyView:
                 self.set_mode(action)
             elif action.startswith("theme:"):
                 self.set_theme(action.split(":", 1)[1])
+            elif action.startswith("zoom:"):
+                value = action.split(":", 1)[1]
+                if value.startswith(("+", "-")):
+                    self.step_zoom(int(value))
+                else:
+                    self.set_zoom(int(value))
             else:
                 actions[action]()
             if not self.running:
@@ -357,9 +391,7 @@ class KeyView:
         height = keyboard_height + PANEL_HEIGHT
         self.logical_w = width
         self.logical_h = height
-        self.scale = min(1.0, (self.screen_w - 30) / width,
-                         (self.screen_h - 90) / height)
-        self.scale = max(0.35, self.scale)
+        self.scale = fit_scale(width, height, self.screen_w, self.screen_h, self.zoom)
         pixel_w = round(width * self.scale)
         pixel_h = round(height * self.scale)
 
@@ -457,9 +489,16 @@ class KeyView:
                 text="·" if mouse_key == "move" else "0",
                 fill=self.palette["count"], font=font(12))
             self.mouse_items[mouse_key] = (shape, text_label, text_count)
+        # Discrete resize grabber in the lower-right corner. Constructed only
+        # on mode/zoom/theme changes, never in the normal refresh loop.
+        grab_x = width - 20
+        grab_y = height - 20
+        self.canvas.create_polygon(
+            grab_x, height - 4, width - 4, grab_y, width - 4, height - 4,
+            fill=self.palette["accent"], outline="")
         if self.scale != 1.0:
             self.canvas.scale("all", 0, 0, self.scale, self.scale)
-        self.root.title(f"YEON KeyView - {MODE_NAMES[mode]}")
+        self.root.title(f"YEON KeyView - {MODE_NAMES[mode]} · {self.zoom}%")
         self.refresh_items(time.monotonic(), force=True)
 
     def refresh_items(self, now, force=False, key_ids=None, mouse_ids=None):
@@ -562,7 +601,7 @@ class KeyView:
         self.theme_choice.set(theme_id)
         self.root.configure(bg=self.palette["background"])
         self.canvas.configure(bg=self.palette["background"])
-        for menu in (self.menu, self.theme_menu):
+        for menu in (self.menu, self.theme_menu, self.size_menu):
             menu.configure(bg=self.palette["menu"], fg=self.palette["text"],
                            activebackground=self.palette["hover"],
                            activeforeground=self.palette["text"])
@@ -575,16 +614,73 @@ class KeyView:
         save_theme(theme_id)
         self.set_mode(self.mode)
 
+    def set_zoom(self, zoom, persist=True):
+        """Rebuild only on explicit size changes, preserving mode and counters."""
+        proposed = clamp_zoom(zoom)
+        if proposed == self.zoom:
+            self.zoom_choice.set(self.zoom)
+            if persist:
+                save_zoom(self.zoom)
+            return
+        self.zoom = proposed
+        self.zoom_choice.set(self.zoom)
+        self.set_mode(self.mode)
+        if persist:
+            save_zoom(self.zoom)
+        if self.tray is not None:
+            try:
+                self.tray.update_menu()
+            except Exception:
+                pass
+
+    def step_zoom(self, offset):
+        self.set_zoom(self.zoom + offset)
+
+    def on_zoom_wheel(self, event):
+        """Ctrl+wheel changes zoom only when the cursor is over the overlay."""
+        if event.delta:
+            self.step_zoom(10 if event.delta > 0 else -10)
+        return "break"
+
     def start_drag(self, event):
-        self.drag_origin = (event.x_root - self.root.winfo_x(),
-                            event.y_root - self.root.winfo_y())
+        """Normal drag moves; grabbing the corner drag handle resizes."""
+        width = max(1, self.root.winfo_width())
+        height = max(1, self.root.winfo_height())
+        if event.x >= width - 23 and event.y >= height - 23:
+            self.resize_origin = (event.x_root, event.y_root, width, height, self.zoom)
+            self.resize_pending = self.zoom
+            self.drag_origin = None
+        else:
+            self.resize_origin = None
+            self.drag_origin = (event.x_root - self.root.winfo_x(),
+                                event.y_root - self.root.winfo_y())
 
     def drag(self, event):
-        if self.drag_origin is not None:
+        if self.resize_origin is not None:
+            sx, sy, start_w, start_h, start_zoom = self.resize_origin
+            # Uniform aspect ratio; diagonal motions use the dominant axis.
+            width_factor = (start_w + event.x_root - sx) / start_w
+            height_factor = (start_h + event.y_root - sy) / start_h
+            factor = width_factor if abs(width_factor - 1) >= abs(height_factor - 1) else height_factor
+            self.resize_pending = clamp_zoom(start_zoom * factor)
+            now = time.monotonic()
+            if now - self.resize_last_draw >= 0.09:
+                self.resize_last_draw = now
+                self.set_zoom(self.resize_pending, persist=False)
+        elif self.drag_origin is not None:
             x = event.x_root - self.drag_origin[0]
             y = event.y_root - self.drag_origin[1]
             self.window_position = (x, y)
             self.root.geometry(f"+{x}+{y}")
+
+    def end_drag(self, event):
+        if self.resize_origin is not None:
+            # Commit the final requested size even if the last drag redraw was throttled.
+            if self.resize_pending is not None:
+                self.set_zoom(self.resize_pending)
+            self.resize_origin = None
+            self.resize_pending = None
+        self.drag_origin = None
 
     def context_menu(self, event):
         try:
