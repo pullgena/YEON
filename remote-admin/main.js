@@ -6,8 +6,9 @@ const {parseTarget} = require('./target');
 const {cleanList, remember, forget} = require('./computers');
 const {FocusSender, send, cookieForSession} = require('./focus_transport');
 const {sendFile,requestFile} = require('./file_transfer');
+const {connectByPin} = require('./code_connect');
 
-const VERSION = '1.3.6';
+const VERSION = '1.3.7';
 let dashboard = null;
 let remote = null;
 let tray = null;
@@ -68,7 +69,7 @@ function closeRemote() {
   setStatus('연결 종료됨');
 }
 
-function openController(address) {
+function openController(address, paired = false) {
   const safeAddress = parseTarget(address);
   if (safeAddress === currentAddress && remote && !remote.isDestroyed()) {
     showRemote();
@@ -98,7 +99,7 @@ function openController(address) {
     catch {event.preventDefault();}
   });
   opened.webContents.on('did-finish-load', () => {
-    if (remote === opened) setStatus('대상 PC 화면 열림 · 8자리 접속 코드를 입력하세요');
+    if (remote === opened) setStatus(paired ? '번호 인증 성공 · 관리 대상 PC 연결 완료 (원격 제어 기본 OFF)' : '대상 PC 화면 열림 · 8자리 접속 코드를 입력하세요');
   });
   opened.on('closed', () => {
     if (remote !== opened) return;
@@ -235,6 +236,23 @@ if (!app.requestSingleInstanceLock()) {
         if(!info.remoteControlEnabled)return {ok:false,error:'원격 제어 OFF입니다. 관리자에서 ON을 누르세요.'};
       } catch(error){return {ok:false,error:error.message};}
       showRemote();setStatus('원격 제어 창 열림');updateTrayMenu();return {ok:true};
+    });
+    let pairingInProgress = false;
+    ipcMain.handle('yeon-admin:connect-code', async (event,pin)=>{
+      if(!valid(event)) return {ok:false,error:'잘못된 요청입니다.'};
+      if(pairingInProgress) return {ok:false,error:'이미 연결 가능한 PC를 찾는 중입니다.'};
+      pairingInProgress = true;
+      setStatus('8자리 번호로 같은 Wi-Fi의 관리 대상 PC를 검색 중…');
+      try {
+        const paired = await connectByPin(pin, session.defaultSession, computers);
+        const result = openController(paired.address, true);
+        updateTrayMenu();
+        setStatus('번호 인증 완료 · 원격 화면 연결 중…');
+        return result;
+      } catch (error) {
+        setStatus('번호 연결 실패');
+        return {ok:false,error:error.message};
+      } finally {pairingInProgress = false;}
     });
     ipcMain.handle('yeon-admin:connect',(event,address)=>{
       if(!valid(event))return {ok:false,error:'잘못된 요청입니다.'};

@@ -156,7 +156,7 @@ class RemoteHTTPServer(ThreadingHTTPServer):
 
 class RemoteHandler(BaseHTTPRequestHandler):
     server: RemoteHTTPServer
-    server_version = "YEONManaged/1.3.6"
+    server_version = "YEONManaged/1.3.7"
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -218,7 +218,11 @@ class RemoteHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.FORBIDDEN, {"error": "공유가 중단되었거나 네트워크에서 접근할 수 없습니다."})
             return
         path = urlsplit(self.path).path
-        if path == "/":
+        if path == "/api/discover":
+            # Advertise the service type only. Never disclose the PIN, sessions,
+            # screenshots, computer identity or other private metadata.
+            self._json(HTTPStatus.OK, {"service": "YEON_REMOTE_MANAGED", "protocol": 1})
+        elif path == "/":
             self._write(HTTPStatus.OK, self.server.page, "text/html; charset=utf-8")
         elif path == "/api/status":
             if not self.server.state.authenticated(self._token()):

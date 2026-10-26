@@ -1,6 +1,6 @@
 {
   "name": "yeon-remote-admin",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "productName": "YEON 원격 조정 - 관리자",
   "description": "YEON 원격 조정: administrator controller for LAN-connected Windows devices",
   "private": true,
@@ -26,6 +26,7 @@
       "computers.js",
       "focus_transport.js",
       "file_transfer.js",
+      "code_connect.js",
       "assets/**/*",
       "package.json"
     ],

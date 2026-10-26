@@ -50,6 +50,13 @@ class APITests(unittest.TestCase):
         code, _, _ = self.connect('GET', '/api/frame')
         self.assertEqual(code, 401)
 
+    def test_discovery_advertises_service_without_disclosing_pin_or_pc_name(self):
+        code, raw, _ = self.connect('GET', '/api/discover')
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(raw), {'service': 'YEON_REMOTE_MANAGED', 'protocol': 1})
+        self.assertNotIn(self.srv.state.pin.encode(), raw)
+        self.assertNotIn(b'computerName', raw)
+
     def test_wrong_pin_rejected(self):
         wrong = '00000000' if self.srv.state.pin != '00000000' else '99999999'
         code, _, _ = self.connect('POST', '/api/login', {'pin': wrong})

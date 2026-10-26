@@ -81,12 +81,12 @@ class ManagedDesktopApp:
 
         panel = tk.Frame(box, bg="#1F2937", padx=18, pady=16)
         panel.pack(fill="x", pady=(22, 13))
-        tk.Label(panel, text="관리자에게 알려줄 접속 주소", fg="#9CA3AF", bg="#1F2937",
+        tk.Label(panel, text="관리자 자동 연결용 접속 정보", fg="#9CA3AF", bg="#1F2937",
                  font=("Malgun Gothic", 10)).pack(anchor="w")
         self.url_label = tk.Label(panel, text="공유를 시작하면 표시됩니다", fg="white",
                                   bg="#1F2937", font=("Segoe UI", 12, "bold"))
         self.url_label.pack(anchor="w", pady=(4, 12))
-        tk.Label(panel, text="일회용 접속 코드", fg="#9CA3AF", bg="#1F2937",
+        tk.Label(panel, text="관리자에 입력할 8자리 접속 번호", fg="#9CA3AF", bg="#1F2937",
                  font=("Malgun Gothic", 10)).pack(anchor="w")
         self.pin_label = tk.Label(panel, text="— — — — — — — —", fg="#818CF8",
                                   bg="#1F2937", font=("Consolas", 22, "bold"))

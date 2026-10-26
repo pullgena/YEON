@@ -1,7 +1,7 @@
 """Use the supplied YEON artwork with a visible tray sharing-status dot."""
 from pathlib import Path
 from PIL import Image, ImageDraw
-VERSION = '1.3.6'
+VERSION = '1.3.7'
 
 def make_tray_icon(sharing: bool, size: int=64) -> Image.Image:
     if size < 32:

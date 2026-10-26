@@ -2,6 +2,7 @@
 const {contextBridge, ipcRenderer} = require('electron');
 contextBridge.exposeInMainWorld('yeonAdmin', Object.freeze({
   connect: address => ipcRenderer.invoke('yeon-admin:connect', address),
+  connectCode: pin => ipcRenderer.invoke('yeon-admin:connect-code', pin),
   disconnect: () => ipcRenderer.invoke('yeon-admin:disconnect'),
   focusStart: () => ipcRenderer.invoke('yeon-admin:focus-start'),
   broadcastStart: () => ipcRenderer.invoke('yeon-admin:broadcast-start'),

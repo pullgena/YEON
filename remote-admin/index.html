@@ -42,20 +42,20 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
   </div>
   <div class="sidebar-computers">
   <div class="sidebar-title">▣ 내 컴퓨터 목록</div>
-  <p class="sidebar-sub">연결했던 PC를 선택하면 해당 원격 화면이 열립니다. 이름은 코드 인증 후 자동으로 표시됩니다.</p>
+  <p class="sidebar-sub">한 번 연결했던 PC는 이름을 눌러 다시 열 수 있습니다. 번호 인증 후 컴퓨터 이름이 표시됩니다.</p>
   <div id="computerList" class="pc-list" aria-live="polite"><p class="pc-empty">등록된 컴퓨터가 없습니다.</p></div>
   </div>
 </aside>
 <main>
 <div class="brand">YEON · REMOTE ADMIN</div>
 <h1>YEON <span>원격 조정</span></h1>
-<p class="subtitle">관리자 전용 프로그램 v1.3.6<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
+<p class="subtitle">관리자 전용 프로그램 v1.3.7<br>실행하면 관리 제어판이 자동으로 열립니다. 관리할 컴퓨터를 연결하세요.</p>
 <section class="card">
 <h2 class="card-title">관리 대상 컴퓨터 연결</h2>
 <form id="connectForm">
-<label for="address">관리 대상 PC 접속 주소</label>
-<input id="address" type="text" placeholder="192.168.0.10:8765" spellcheck="false" autocomplete="off" maxlength="200" required>
-<div class="example">관리받는 PC의 화면에 표시되는 주소를 입력하세요.</div>
+<label for="accessCode">관리 대상 PC의 8자리 접속 번호</label>
+<input id="accessCode" type="text" inputmode="numeric" pattern="[0-9]{8}" placeholder="8자리 숫자 입력" autocomplete="one-time-code" maxlength="8" required>
+<div class="example">IP 주소는 필요 없습니다. 같은 Wi-Fi에 있는 공유 중인 관리 대상 PC를 자동으로 찾아 연결합니다.</div>
 <div class="actions"><button class="primary" type="submit" id="connect">원격 조정 시작 →</button><button class="secondary" type="button" id="disconnect">연결 종료</button></div>
 </form>
 <div class="error" id="error" role="alert"></div>
@@ -71,7 +71,7 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
     <button type="button" id="controlOn" class="focus" disabled>🖱 원격 제어 ON</button>
     <button type="button" id="controlOff" class="secondary" disabled>원격 제어 OFF</button>
   </div>
-  <div id="controlPermission" role="status" style="padding-top:9px">먼저 대상 PC 연결 후 8자리 코드로 로그인하세요.</div>
+  <div id="controlPermission" role="status" style="padding-top:9px">먼저 8자리 번호로 관리 대상 PC에 연결하세요.</div>
 </section>
 <p class="notice">일반 화면 전송은 관리 대상 PC의 크기 조절 가능한 일반 창에 관리자 화면을 표시하며 마우스를 잠그지 않습니다.<br>집중 화면 전송은 관리자 PC 화면을 관리 대상 PC에 크게 표시합니다. 관리 대상 사용자의 <strong>현장 승인</strong> 후 작동하며, 대상 PC에서 <strong>ESC</strong>로 즉시 중단할 수 있습니다.</p>
 <div class="statusbox"><span class="dot"></span><span id="status">대기 중</span></div>
@@ -80,8 +80,8 @@ input:focus{border-color:#9cafff;box-shadow:0 0 0 3px #6c79e33a}
 <h2>연결 방법</h2>
 <p><span class="num">01</span> 관리받는 PC에서 <b>YEON 원격 조정 (공유용)</b> 앱 실행</p>
 <p><span class="num">02</span> 해당 PC에서 <b>공유 시작</b>을 눌러 주소와 8자리 코드를 확인</p>
-<p><span class="num">03</span> 이 관리자 앱에 주소 입력 또는 왼쪽 컴퓨터 이름 클릭 → 원격 화면 열기</p>
-<p><span class="num">04</span> 열린 창에 8자리 코드를 입력한 뒤 관리자에서 원격 제어 ON 선택</p>
+<p><span class="num">03</span> 관리자 앱에 8자리 번호만 입력 → 자동 검색·로그인·원격 화면 열기</p>
+<p><span class="num">04</span> 관리자에서 원격 제어 ON을 누르면 마우스·키보드 사용 가능</p>
 </section>
 <div class="footer">X 버튼은 알림 영역으로 최소화 · 우측 하단 YEON 아이콘 우클릭 → 완전 종료<br>같은 Wi-Fi/사설 네트워크에서만 연결 · 대상 PC의 동의 필요</div>
 </main>
@@ -91,7 +91,7 @@ const $=id=>document.getElementById(id);
 let activeAddress='';
 function renderComputers(list){
   const el=$('computerList');el.replaceChildren();
-  if(!Array.isArray(list)||!list.length){const p=document.createElement('p');p.className='pc-empty';p.textContent='등록된 컴퓨터가 없습니다. 주소를 입력해 연결하세요.';el.append(p);return;}
+  if(!Array.isArray(list)||!list.length){const p=document.createElement('p');p.className='pc-empty';p.textContent='등록된 컴퓨터가 없습니다. 8자리 번호로 연결하세요.';el.append(p);return;}
   for(const item of list){
     const row=document.createElement('div');row.className='pc-item'+(item.address===activeAddress?' active':'');
     const button=document.createElement('button');button.className='pc-select';button.type='button';
@@ -99,7 +99,7 @@ function renderComputers(list){
     const address=document.createElement('span');address.className='pc-address';address.textContent=item.address.replace(/^http:\/\//,'');
     button.append(title,address);button.title=`${item.name} 원격 화면 열기`;
     button.addEventListener('click',async()=>{
-      $('error').textContent='';$('address').value=item.address;
+      $('error').textContent='';
       const result=await window.yeonAdmin.connect(item.address);
       if(!result.ok)$('error').textContent=result.error||'원격 화면을 열 수 없습니다.';
     });
@@ -122,8 +122,9 @@ $('connectForm').addEventListener('submit',async event=>{
   event.preventDefault();$('error').textContent='';
   $('connect').disabled=true;
   try{
-    const result=await window.yeonAdmin.connect($('address').value);
+    const result=await window.yeonAdmin.connectCode($('accessCode').value.trim());
     if(!result.ok)$('error').textContent=result.error||'접속할 수 없습니다.';
+    else $('accessCode').value='';
   }catch(err){$('error').textContent='연결 요청을 처리할 수 없습니다.';}
   finally{$('connect').disabled=false;}
 });
@@ -168,14 +169,14 @@ async function refreshPermission(){
   const result=await window.yeonAdmin.controlPermission().catch(()=>({ok:false}));
   $('controlOn').disabled = !result.ok || result.enabled;
   $('controlOff').disabled = !result.ok || !result.enabled;
-  $('controlPermission').textContent=!result.ok ? '원격 제어 상태: 대상 PC의 8자리 코드 로그인 후 변경할 수 있습니다.' :
+  $('controlPermission').textContent=!result.ok ? '원격 제어 상태: 대상 PC에 번호로 연결한 뒤 변경할 수 있습니다.' :
      (result.enabled ? '● 원격 제어 ON · 관리자에서 마우스·키보드 조작을 허용했습니다.' : '● 원격 제어 OFF · 화면만 볼 수 있습니다.');
 }
 setInterval(refreshPermission,3500);
 refreshPermission();
 window.yeonAdmin.onStatus(data=>{syncState(data);refreshPermission();});
 window.yeonAdmin.getStatus().then(syncState);
-$('address').focus();
+$('accessCode').focus();
 </script>
 </body>
 </html>
