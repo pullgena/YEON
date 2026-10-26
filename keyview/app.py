@@ -1,4 +1,4 @@
-"""YEON KeyView v1.3: event-driven canvas, three keyboard modes, background tray."""
+"""YEON KeyView v1.4: efficient keyboard and mouse input overlay with tray."""
 import queue
 import sys
 import threading
@@ -7,13 +7,16 @@ import tkinter as tk
 
 import keyboard
 import pystray
+from pynput import mouse as mouse_hook
 from PIL import Image, ImageDraw
 
 from keymap import resolve_key
 from modes import MODE_NAMES, get_mode_geometry, label_in_mode, mode_for_chord
+from mouse_panel import PANEL_HEIGHT, mouse_panel_geometry
+from mouse_stats import MouseCounter, MOUSE_LABELS
 from stats import KeyCounter
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 BG = "#080511"
 KEY_BG = "#221633"
 KEY_EDGE = "#9657E8"
@@ -60,6 +63,9 @@ class KeyView:
         self.events = queue.SimpleQueue()
         self.commands = queue.SimpleQueue()
         self.counter = KeyCounter()
+        self.mouse_counter = MouseCounter()
+        self.next_motion_at = 0.0
+        self.mouse_listener = None
         self.mode = "full"
         self.running = True
         self.visible = True
@@ -72,6 +78,10 @@ class KeyView:
         self.drag_origin = None
         self.key_items = {}
         self.cached = {}
+        self.mouse_items = {}
+        self.cached_mouse = {}
+        self.mouse_total_item = None
+        self.last_mouse_total = None
         self.kps_item = None
         self.total_item = None
         self.last_footer = None
@@ -96,7 +106,7 @@ class KeyView:
         self.menu.add_command(label="백그라운드로 숨기기", command=self.hide)
         self.menu.add_command(label="입력 감지 중지 / 시작", command=self.toggle_capture)
         self.menu.add_command(label="항상 위 켜기 / 끄기", command=self.toggle_pin)
-        self.menu.add_command(label="카운터 초기화", command=self.reset_counts)
+        self.menu.add_command(label="키보드·마우스 카운터 초기화", command=self.reset_counts)
         self.menu.add_separator()
         self.menu.add_command(label="완전히 종료", command=self.exit)
 
@@ -120,7 +130,7 @@ class KeyView:
             pystray.MenuItem("백그라운드로 숨기기", enqueue("hide")),
             pystray.MenuItem("입력 감지 중지 / 시작", enqueue("capture")),
             pystray.MenuItem("항상 위 켜기 / 끄기", enqueue("pin")),
-            pystray.MenuItem("카운터 초기화", enqueue("reset")),
+            pystray.MenuItem("키보드·마우스 카운터 초기화", enqueue("reset")),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("완전히 종료", enqueue("exit")),
         )
@@ -144,16 +154,34 @@ class KeyView:
             except Exception:
                 pass
             self.hook = None
+        if self.mouse_listener is not None:
+            try:
+                self.mouse_listener.stop()
+            except Exception:
+                pass
+            self.mouse_listener = None
         self.capture_enabled = False
         self.counter.release_all()
+        self.mouse_counter.release_all()
         self.drain_events()
         if enabled:
+            errors = []
             try:
                 self.hook = keyboard.hook(self.on_key, suppress=False)
-                self.capture_enabled = True
-                self.capture_error = ""
             except Exception as error:
-                self.capture_error = type(error).__name__
+                errors.append("Keyboard: " + type(error).__name__)
+            try:
+                listener = mouse_hook.Listener(
+                    on_click=self.on_mouse_click,
+                    on_scroll=self.on_mouse_scroll,
+                    on_move=self.on_mouse_move,
+                )
+                listener.start()
+                self.mouse_listener = listener
+            except Exception as error:
+                errors.append("Mouse: " + type(error).__name__)
+            self.capture_enabled = self.hook is not None or self.mouse_listener is not None
+            self.capture_error = ", ".join(errors)
 
     def toggle_capture(self):
         self.set_capture(not self.capture_enabled)
@@ -166,7 +194,30 @@ class KeyView:
                              getattr(event, "scan_code", None),
                              getattr(event, "is_keypad", False))
         if key_id:
-            self.events.put((key_id, event.event_type == "down", time.monotonic()))
+            self.events.put(("key", key_id, event.event_type == "down", time.monotonic()))
+
+    def on_mouse_click(self, x, y, button, pressed):
+        # Screen coordinates are intentionally ignored: never record the pointer path.
+        if not self.capture_enabled:
+            return
+        name = getattr(button, "name", "")
+        if name in ("left", "middle", "right"):
+            self.events.put(("mouse_button", name, pressed, time.monotonic()))
+
+    def on_mouse_scroll(self, x, y, dx, dy):
+        if self.capture_enabled and dy:
+            self.events.put(("mouse_scroll",
+                             "scroll_up" if dy > 0 else "scroll_down",
+                             True, time.monotonic()))
+
+    def on_mouse_move(self, x, y):
+        # 8Hz maximum movement events: no cursor coordinates kept or queued.
+        if not self.capture_enabled:
+            return
+        now = time.monotonic()
+        if now >= self.next_motion_at:
+            self.next_motion_at = now + 0.125
+            self.events.put(("mouse_move", "move", True, now))
 
     def drain_events(self):
         while True:
@@ -198,16 +249,23 @@ class KeyView:
         target_mode = None
         for _ in range(600):
             try:
-                key_id, down, timestamp = self.events.get_nowait()
+                kind, key_id, down, timestamp = self.events.get_nowait()
             except queue.Empty:
                 break
             if not self.capture_enabled:
                 continue
-            held_before = self.counter.held.copy() if down and key_id in ("1", "2", "3") else ()
-            is_new = self.counter.add_event(key_id, down, timestamp)
-            requested = mode_for_chord(key_id, down, is_new, held_before)
-            if requested is not None:
-                target_mode = requested
+            if kind == "mouse_button":
+                self.mouse_counter.add_button(key_id, down, timestamp)
+            elif kind == "mouse_scroll":
+                self.mouse_counter.add_scroll(key_id, timestamp)
+            elif kind == "mouse_move":
+                self.mouse_counter.add_motion(timestamp)
+            elif kind == "key":
+                held_before = self.counter.held.copy() if down and key_id in ("1", "2", "3") else ()
+                is_new = self.counter.add_event(key_id, down, timestamp)
+                requested = mode_for_chord(key_id, down, is_new, held_before)
+                if requested is not None:
+                    target_mode = requested
         if target_mode is not None and self.mode != target_mode:
             self.set_mode(target_mode)
 
@@ -223,7 +281,8 @@ class KeyView:
         if preserve_position and self.window_position is None:
             self.window_position = (self.root.winfo_x(), self.root.winfo_y())
         self.mode = mode
-        width, height, footer_y, positions = get_mode_geometry(mode)
+        width, keyboard_height, footer_y, positions = get_mode_geometry(mode)
+        height = keyboard_height + PANEL_HEIGHT
         self.logical_w = width
         self.logical_h = height
         self.scale = min(1.0, (self.screen_w - 30) / width,
@@ -245,6 +304,9 @@ class KeyView:
         self.canvas.delete("all")
         self.key_items.clear()
         self.cached.clear()
+        self.mouse_items.clear()
+        self.cached_mouse.clear()
+        self.last_mouse_total = None
         self.last_footer = None
 
         def font(size):
@@ -289,6 +351,27 @@ class KeyView:
         self.total_item = self.canvas.create_text(width - side_pad - 10, fy,
                                                   anchor="e", text="0",
                                                   fill=TEXT, font=font(15))
+
+        # Separate purple mouse panel, kept in all three keyboard modes.
+        heading, mouse_boxes = mouse_panel_geometry(width, keyboard_height)
+        hx, hy, hw, hh = heading
+        rounded_box(self.canvas, hx, hy, hw, hh, 5,
+                    fill=FOOT_BG, outline=KEY_EDGE, width=1.7)
+        self.canvas.create_text(hx + hw / 2, hy + 22, text="MOUSE",
+                                fill=TEXT, font=font(12))
+        self.mouse_total_item = self.canvas.create_text(
+            hx + hw / 2, hy + 50, text="0", fill=COUNT_TEXT, font=font(15))
+        for mouse_key, (mx, my, mw, mh) in mouse_boxes.items():
+            shape = rounded_box(self.canvas, mx, my, mw, mh, 5,
+                                fill=KEY_BG, outline=KEY_EDGE, width=1.8)
+            text_label = self.canvas.create_text(
+                mx + mw / 2, my + 22, text=MOUSE_LABELS[mouse_key],
+                fill=TEXT, font=font(11 if mouse_key != "move" else 9))
+            text_count = self.canvas.create_text(
+                mx + mw / 2, my + mh - 13,
+                text="·" if mouse_key == "move" else "0",
+                fill=COUNT_TEXT, font=font(12))
+            self.mouse_items[mouse_key] = (shape, text_label, text_count)
         if self.scale != 1.0:
             self.canvas.scale("all", 0, 0, self.scale, self.scale)
         self.root.title(f"YEON KeyView - {MODE_NAMES[mode]}")
@@ -318,6 +401,22 @@ class KeyView:
             self.canvas.itemconfigure(self.total_item, text=str(footer[1]))
             self.last_footer = footer
 
+        for mouse_key, (shape, label_item, count_item) in self.mouse_items.items():
+            active = self.mouse_counter.highlighted(mouse_key, now)
+            value = ("●" if active else "·") if mouse_key == "move" else self.mouse_counter.counts[mouse_key]
+            state = (active, value)
+            old = self.cached_mouse.get(mouse_key)
+            if force or old != state:
+                if force or old is None or old[0] != active:
+                    self.canvas.itemconfigure(shape, fill=ACTIVE_BG if active else KEY_BG,
+                                              outline=ACTIVE_EDGE if active else KEY_EDGE)
+                if force or old is None or old[1] != value:
+                    self.canvas.itemconfigure(count_item, text=str(value))
+                self.cached_mouse[mouse_key] = state
+        if force or self.last_mouse_total != self.mouse_counter.total:
+            self.canvas.itemconfigure(self.mouse_total_item, text=str(self.mouse_counter.total))
+            self.last_mouse_total = self.mouse_counter.total
+
     def start_drag(self, event):
         self.drag_origin = (event.x_root - self.root.winfo_x(),
                             event.y_root - self.root.winfo_y())
@@ -341,6 +440,7 @@ class KeyView:
 
     def reset_counts(self):
         self.counter.reset()
+        self.mouse_counter.reset()
         self.drain_events()
         if self.visible:
             self.refresh_items(time.monotonic(), force=True)
