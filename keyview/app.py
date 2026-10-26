@@ -1,4 +1,4 @@
-"""YEON KeyView - compact violet keyboard overlay with visible tray controls."""
+"""YEON KeyView - 104-key purple overlay, Shift glyphs and background tray mode."""
 import queue
 import sys
 import threading
@@ -10,26 +10,21 @@ import pystray
 from PIL import Image, ImageDraw
 
 from keymap import resolve_key
-from stats import KeyCounter, label_for
+from layout import WIDTH, HEIGHT, FOOTER_Y, keyboard_rectangles
+from stats import KeyCounter
 
-VERSION = "1.1.0"
-WIDTH, HEIGHT = 386, 127
-PADDING = 3
-CELL_GAP = 4
-CELL_WIDTH = (WIDTH - 2 * PADDING - 7 * CELL_GAP) / 8
-CELL_HEIGHT = 44
+VERSION = "1.2.0"
 BG = "#080511"
-CELL_BG = "#231837"
-CELL_STROKE = "#9657E8"
+CELL_BG = "#221633"
+CELL_STROKE = "#9A56EE"
 CELL_GLOW = "#4C2584"
-HELD_BG = "#6737AB"
+HELD_BG = "#6636AA"
 HELD_BORDER = "#E7BCFF"
 TEXT = "#FBF5FF"
 COUNT_TEXT = "#DECEFA"
 
 
 def rounded_box(canvas, x, y, w, h, radius, **kw):
-    """Smooth rounded rectangle drawn directly with Tk canvas primitives."""
     r = min(radius, w / 2, h / 2)
     points = [
         x + r, y, x + w - r, y, x + w, y,
@@ -37,7 +32,7 @@ def rounded_box(canvas, x, y, w, h, radius, **kw):
         x + w - r, y + h, x + r, y + h, x, y + h,
         x, y + h - r, x, y + r, x, y,
     ]
-    return canvas.create_polygon(points, smooth=True, splinesteps=12, **kw)
+    return canvas.create_polygon(points, smooth=True, splinesteps=9, **kw)
 
 
 def make_tray_image():
@@ -54,21 +49,31 @@ class KeyView:
     def __init__(self):
         if sys.platform != "win32":
             raise RuntimeError("YEON KeyView requires Windows.")
+
         self.root = tk.Tk()
         self.root.withdraw()
-        self.root.title("YEON KeyView")
+        self.root.title(f"YEON KeyView {VERSION}")
         self.root.configure(bg=BG)
         self.root.overrideredirect(True)
         self.root.resizable(False, False)
 
+        # 104 keys are all visible, also on smaller laptop displays.
         screen_w = self.root.winfo_screenwidth()
-        x = max(0, screen_w - WIDTH - 34)
-        self.root.geometry(f"{WIDTH}x{HEIGHT}+{x}+180")
-        self.pinned = True
+        screen_h = self.root.winfo_screenheight()
+        self.scale = min(1.0, max(0.45, (screen_w - 48) / WIDTH),
+                         max(0.45, (screen_h - 90) / HEIGHT))
+        self.display_w = round(WIDTH * self.scale)
+        self.display_h = round(HEIGHT * self.scale)
+        x = max(0, screen_w - self.display_w - 24)
+        y = max(0, min(180, screen_h - self.display_h - 64))
+        self.root.geometry(f"{self.display_w}x{self.display_h}+{x}+{y}")
         self.root.attributes("-topmost", True)
+
+        self.pinned = True
         self.events = queue.SimpleQueue()
         self.commands = queue.SimpleQueue()
         self.counter = KeyCounter()
+        self.key_rects = keyboard_rectangles()
         self.running = True
         self.capture_enabled = False
         self.hook = None
@@ -76,8 +81,10 @@ class KeyView:
         self.tray_started = False
         self.visible = True
         self.drag_origin = None
+        self.capture_error = ""
 
-        self.canvas = tk.Canvas(self.root, width=WIDTH, height=HEIGHT, bg=BG,
+        self.canvas = tk.Canvas(self.root, width=self.display_w,
+                                height=self.display_h, bg=BG,
                                 highlightthickness=0, bd=0, relief="flat")
         self.canvas.pack()
         self.canvas.bind("<ButtonPress-1>", self.start_drag)
@@ -98,7 +105,7 @@ class KeyView:
         self.set_capture(True)
         self.root.deiconify()
         self.redraw(time.monotonic())
-        self.root.after(33, self.tick)
+        self.root.after(50, self.tick)
 
     def install_tray(self):
         def enqueue(action):
@@ -140,19 +147,20 @@ class KeyView:
             try:
                 self.hook = keyboard.hook(self.on_keyboard_event, suppress=False)
                 self.capture_enabled = True
+                self.capture_error = ""
             except Exception as error:
-                print(f"KeyView keyboard hook error: {error}", file=sys.stderr)
+                self.capture_error = type(error).__name__
 
     def toggle_capture(self):
         self.set_capture(not self.capture_enabled)
 
     def on_keyboard_event(self, event):
-        # Hook callback is on a worker thread: never call Tkinter from here.
+        # The keyboard library invokes this callback off the Tkinter UI thread.
         key_id = resolve_key(getattr(event, "name", None),
                              getattr(event, "scan_code", None),
                              getattr(event, "is_keypad", False))
         if key_id:
-            self.events.put((key_id, event.event_type == "down"))
+            self.events.put((key_id, event.event_type == "down", time.monotonic()))
 
     def drain_keyboard_events(self):
         while True:
@@ -177,56 +185,70 @@ class KeyView:
             if not self.running:
                 return
 
-        now = time.monotonic()
-        for _ in range(500):
+        for _ in range(700):
             try:
-                key_id, pressed = self.events.get_nowait()
+                key_id, pressed, event_time = self.events.get_nowait()
             except queue.Empty:
                 break
             if self.capture_enabled:
-                self.counter.add_event(key_id, pressed, now)
+                self.counter.add_event(key_id, pressed, event_time)
+
+        now = time.monotonic()
         self.counter.kps(now)
         if self.visible:
             self.redraw(now)
-        self.root.after(33, self.tick)
+        self.root.after(50, self.tick)
 
     def redraw(self, now):
         canvas = self.canvas
         canvas.delete("all")
-        for i, key_id in enumerate(self.counter.slots):
-            x = PADDING + (i % 8) * (CELL_WIDTH + CELL_GAP)
-            y = PADDING + (i // 8) * (CELL_HEIGHT + 4)
+
+        def font(size, bold=True):
+            return ("Segoe UI", max(7, round(size * self.scale)),
+                    "bold" if bold else "normal")
+
+        for key_id, (x, y, width, height) in self.key_rects.items():
             hot = self.counter.highlighted(key_id, now)
-            rounded_box(canvas, x, y, CELL_WIDTH, CELL_HEIGHT, 5,
+            rounded_box(canvas, x, y, width, height, 5,
                         fill=HELD_BG if hot else CELL_BG,
                         outline=HELD_BORDER if hot else CELL_GLOW,
-                        width=3)
-            rounded_box(canvas, x + 1, y + 1, CELL_WIDTH - 2, CELL_HEIGHT - 2, 5,
+                        width=2.7)
+            rounded_box(canvas, x + 1, y + 1, width - 2, height - 2, 4,
                         fill=HELD_BG if hot else CELL_BG,
                         outline=HELD_BORDER if hot else CELL_STROKE,
-                        width=1.6)
-            label = label_for(key_id)
-            font_size = 15 if len(label) <= 3 else (12 if len(label) <= 5 else 10)
-            canvas.create_text(x + CELL_WIDTH / 2, y + 15, text=label,
-                               fill=TEXT, font=("Segoe UI", font_size, "bold"))
-            canvas.create_text(x + CELL_WIDTH / 2, y + 35,
+                        width=1.2)
+            label = self.counter.label(key_id, now)
+            label_size = 16 if len(label) <= 2 else (12 if len(label) <= 5 else 10)
+            label_y = y + (17 if height < 60 else height / 2 - 10)
+            count_y = y + (38 if height < 60 else height / 2 + 15)
+            canvas.create_text(x + width / 2, label_y, text=label,
+                               fill=TEXT, font=font(label_size))
+            canvas.create_text(x + width / 2, count_y,
                                text=str(self.counter.counts.get(key_id, 0)),
-                               fill=COUNT_TEXT, font=("Segoe UI", 11, "bold"))
-        foot_y = 100
-        foot_width = (WIDTH - PADDING * 2 - 4) / 2
-        for x in (PADDING, PADDING + foot_width + 4):
-            rounded_box(canvas, x, foot_y, foot_width, 24, 4,
-                        fill="#20152F", outline=CELL_STROKE, width=1.7)
-        canvas.create_text(9, 111.5, anchor="w", text="KPS",
-                           fill=TEXT, font=("Segoe UI", 13, "bold"))
-        canvas.create_text(PADDING + foot_width - 7, 111.5, anchor="e",
-                           text=str(self.counter.kps(now)),
-                           fill=TEXT, font=("Segoe UI", 13, "bold"))
-        canvas.create_text(PADDING + foot_width + 11, 111.5, anchor="w",
-                           text="Total", fill=TEXT, font=("Segoe UI", 13, "bold"))
-        canvas.create_text(WIDTH - 11, 111.5, anchor="e",
-                           text=str(self.counter.total),
-                           fill=TEXT, font=("Segoe UI", 13, "bold"))
+                               fill=COUNT_TEXT, font=font(10))
+
+        footer_x = 12
+        footer_width = (WIDTH - 2 * footer_x - 8) / 2
+        for left in (footer_x, footer_x + footer_width + 8):
+            rounded_box(canvas, left, FOOTER_Y, footer_width, 29, 4,
+                        fill="#20152F", outline=CELL_STROKE, width=1.8)
+
+        canvas.create_text(footer_x + 10, FOOTER_Y + 15, anchor="w",
+                           text="KPS", fill=TEXT, font=font(16))
+        canvas.create_text(footer_x + footer_width - 14, FOOTER_Y + 15, anchor="e",
+                           text=str(self.counter.kps(now)), fill=TEXT, font=font(16))
+        canvas.create_text(footer_x + footer_width + 18, FOOTER_Y + 15,
+                           anchor="w", text="Total", fill=TEXT, font=font(16))
+        canvas.create_text(WIDTH - footer_x - 14, FOOTER_Y + 15,
+                           anchor="e", text=str(self.counter.total),
+                           fill=TEXT, font=font(16))
+        if self.capture_error:
+            canvas.create_text(WIDTH / 2, HEIGHT - 7, anchor="s",
+                               text="키 입력 감지를 시작할 수 없습니다: " + self.capture_error,
+                               fill="#FF8DA0", font=font(9))
+        # Canvas item coordinates must be scaled to the actual window dimensions.
+        if self.scale != 1.0:
+            canvas.scale("all", 0, 0, self.scale, self.scale)
 
     def start_drag(self, event):
         self.drag_origin = (event.x_root - self.root.winfo_x(),

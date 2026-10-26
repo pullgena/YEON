@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify keyboard mapping and counter logic
+      - name: Verify 104-key layout, Shift mapping and counter logic
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
       - name: Compile all Python sources
         run: python -m compileall -q keyview
@@ -45,12 +45,11 @@ jobs:
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.1.${{ github.run_number }}
-          name: YEON KeyView v1.1.${{ github.run_number }}
+          tag_name: keyview-v1.2.${{ github.run_number }}
+          name: YEON KeyView v1.2.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Compact purple KeyView keyboard overlay for Windows.
-            - Key count, KPS and Total counter
-            - Background operation through visible system tray icon
-            - Mouse drag, right-click menu, capture pause and reset
+            Purple full ANSI 104-key physical keyboard overlay for Windows.
+            Shift combinations display symbols such as Shift+1 = !.
+            Background system-tray mode, per-key counts, KPS and Total.
