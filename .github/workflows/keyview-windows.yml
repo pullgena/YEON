@@ -27,11 +27,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r keyview/requirements.txt
           python -m pip install pyinstaller
-      - name: Verify 104-key layout, Shift mapping and counter logic
+      - name: Verify keyboard maps, hotkeys and counters
         run: python -m unittest discover -s keyview/tests -p "test_*.py"
-      - name: Compile all Python sources
+      - name: Compile Python code
         run: python -m compileall -q keyview
-      - name: Build portable Windows EXE
+      - name: Build Windows EXE
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name YEON-KeyView --paths keyview --hidden-import pystray._win32 keyview/app.py
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
@@ -40,16 +40,16 @@ jobs:
           path: dist/YEON-KeyView.exe
           if-no-files-found: error
           retention-days: 30
-      - name: Publish separate KeyView release
+      - name: Publish KeyView release
         if: github.event_name == 'push'
         continue-on-error: true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: keyview-v1.2.${{ github.run_number }}
-          name: YEON KeyView v1.2.${{ github.run_number }}
+          tag_name: keyview-v1.3.${{ github.run_number }}
+          name: YEON KeyView v1.3.${{ github.run_number }}
           files: dist/YEON-KeyView.exe
           make_latest: false
           body: |
-            Purple full ANSI 104-key physical keyboard overlay for Windows.
-            Shift combinations display symbols such as Shift+1 = !.
-            Background system-tray mode, per-key counts, KPS and Total.
+            Reduced redraw work by caching the keyboard canvas.
+            Shift+1: photo 16-key layout; Shift+2: WASD + Space; Shift+3: full 104-key.
+            Windows tray background mode, per-key counts, KPS and Total.
